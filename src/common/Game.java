@@ -2,14 +2,8 @@ package common;
 
 import java.io.Serializable;
 
-/**
- * Η κλάση Game αναπαριστά ένα παιχνίδι στο σύστημα.
- * Υλοποιεί το Serializable ώστε τα αντικείμενα αυτής της κλάσης
- * να μπορούν να ταξιδέψουν μέσω των TCP Sockets (ObjectInputStream/ObjectOutputStream).
- */
 public class Game implements Serializable {
 
-    // Καλό είναι να υπάρχει πάντα ένα serialVersionUID όταν στέλνουμε αντικείμενα μέσω δικτύου
     private static final long serialVersionUID = 1L;
 
     // --- 1. Πεδία που διαβάζονται από το JSON ---
@@ -21,72 +15,122 @@ public class Game implements Serializable {
     private double minBet;
     private double maxBet;
     private String riskLevel;
-    private String hashKey;
+    private String hashKey; // Αυτό είναι το Secret S για την επικοινωνία με τον SRG
 
     // --- 2. Πεδία που υπολογίζονται από το σύστημα ---
-    // ΠΡΟΣΟΧΗ: Αυτά τα πεδία ΔΕΝ διαβάζονται από το JSON.
     private String betCategory;
     private int jackpot;
 
-    // --- 3. Σταθερές: Πίνακες Ρίσκου ---
-    // TODO: Δηλώστε εδώ τους 3 πίνακες (Low, Medium, High) με τους πολλαπλασιαστές
-    // σύμφωνα με την εκφώνηση.
+    // ΠΡΟΣΘΗΚΗ: Συνολικά κέρδη/ζημιές του συστήματος από αυτό το παιχνίδι
+    private double totalProfit;
 
+    // --- 3. Σταθερές: Πίνακες Ρίσκου ---
+    private static final double[] LOW_RISK = {0.0, 0.0, 0.0, 0.1, 0.5, 1.0, 1.1, 1.3, 2.0, 2.5};
+    private static final double[] MEDIUM_RISK = {0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.5, 2.5, 3.5};
+    private static final double[] HIGH_RISK = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 6.5};
 
     /**
      * Constructor του παιχνιδιού.
-     * Εδώ περνάμε τα δεδομένα που κάναμε parse από το JSON.
      */
     public Game(String gameName, String providerName, int stars, int noOfVotes,
                 String gameLogo, double minBet, double maxBet, String riskLevel, String hashKey) {
 
-        // TODO: Αρχικοποιήστε τα πεδία της κλάσης (this.gameName = gameName κλπ.)
+        this.gameName = gameName;
+        this.providerName = providerName;
+        this.stars = stars;
+        this.noOfVotes = noOfVotes;
+        this.gameLogo = gameLogo;
+        this.minBet = minBet;
+        this.maxBet = maxBet;
+        this.riskLevel = riskLevel != null ? riskLevel.toLowerCase() : "low";
+        this.hashKey = hashKey;
+        this.totalProfit = 0.0; // Αρχικά τα κέρδη είναι 0
 
-
-        // Αφού πάρουμε τα βασικά δεδομένα, καλούμε τις μεθόδους για
-        // να υπολογίσουν τα πεδία που λείπουν.
         calculateBetCategory();
         calculateJackpot();
     }
 
     /**
-     * TODO: Υπολογισμός Κατηγορίας Πονταρίσματος.
-     * Πρέπει να ελέγχει το πεδίο minBet και να θέτει το πεδίο betCategory:
-     * - Αν minBet είναι 0.1 -> "$"
-     * - Αν minBet είναι 1 -> "$$"
-     * - Αν minBet είναι 5 -> "$$$"
+     * Υπολογισμός Κατηγορίας Πονταρίσματος.
+     * Tip: Χρησιμοποιούμε Math.abs για τη σύγκριση double ώστε να αποφύγουμε
+     * προβλήματα ακρίβειας της Java (π.χ. το 0.1 να αποθηκευτεί ως 0.10000000000001).
      */
     private void calculateBetCategory() {
-        // Γράψτε τη λογική σας εδώ
+        if (Math.abs(minBet - 0.1) < 0.001) {
+            this.betCategory = "$";
+        } else if (Math.abs(minBet - 1.0) < 0.001) {
+            this.betCategory = "$$";
+        } else if (Math.abs(minBet - 5.0) < 0.001) {
+            this.betCategory = "$$$";
+        } else {
+            this.betCategory = "Unknown"; // Fallback περίπτωση
+        }
     }
 
     /**
-     * TODO: Υπολογισμός του Jackpot.
-     * Πρέπει να ελέγχει το πεδίο riskLevel και να θέτει το πεδίο jackpot:
-     * - Low -> 10
-     * - Medium -> 20
-     * - High -> 40
+     * Υπολογισμός του Jackpot βάσει του riskLevel.
      */
     private void calculateJackpot() {
-        // Γράψτε τη λογική σας εδώ
+        switch (this.riskLevel) {
+            case "low":
+                this.jackpot = 10;
+                break;
+            case "medium":
+                this.jackpot = 20;
+                break;
+            case "high":
+                this.jackpot = 40;
+                break;
+            default:
+                this.jackpot = 10; // Default fallback
+        }
     }
 
     /**
-     * TODO: Επιστροφή του σωστού πίνακα ρίσκου.
-     * Αυτή η μέθοδος θα φανεί πολύ χρήσιμη στο Άτομο 3 (Casino Engine)
-     * για να υπολογίσει το κέρδος κατά το ποντάρισμα.
+     * Επιστροφή του σωστού πίνακα ρίσκου.
      */
     public double[] getRiskArray() {
-        // Γράψτε τη λογική σας εδώ: επιστρέψτε τον σωστό πίνακα (Low, Medium ή High)
-        // ανάλογα με το riskLevel.
-        return null; // Προσωρινό return για να μην χτυπάει σφάλμα
+        switch (this.riskLevel) {
+            case "low": return LOW_RISK;
+            case "medium": return MEDIUM_RISK;
+            case "high": return HIGH_RISK;
+            default: return LOW_RISK;
+        }
+    }
+
+    // --- ΚΡΙΣΙΜΗ ΠΡΟΣΘΗΚΗ ΓΙΑ ΤΟΝ WORKER ---
+
+    /**
+     * Ενημερώνει τα συνολικά κέρδη του παιχνιδιού.
+     * Είναι synchronized επειδή πολλαπλά threads (παίκτες)
+     * μπορεί να ποντάρουν ταυτόχρονα στο ίδιο παιχνίδι!
+     */
+    public synchronized void updateProfit(double amount) {
+        this.totalProfit += amount;
     }
 
     // --- 4. Getters και Setters ---
-    // TODO: Δημιουργήστε τους Getters για να μπορείτε να διαβάζετε τις τιμές (π.χ. getGameName(), getMinBet() κλπ.)
 
+    public String getGameName() { return gameName; }
+    public String getProviderName() { return providerName; }
+    public int getStars() { return stars; }
+    public int getNoOfVotes() { return noOfVotes; }
+    public String getGameLogo() { return gameLogo; }
+    public double getMinBet() { return minBet; }
+    public double getMaxBet() { return maxBet; }
+    public String getHashKey() { return hashKey; }
+    public String getBetCategory() { return betCategory; }
+    public int getJackpot() { return jackpot; }
+    public synchronized double getTotalProfit() { return totalProfit; }
 
-    // TODO: Δημιουργήστε Setter για το riskLevel (και θυμηθείτε να καλείτε
-    // ξανά την calculateJackpot() μέσα στον setter, γιατί αν αλλάξει το ρίσκο, αλλάζει και το jackpot!)
+    public String getRiskLevel() { return riskLevel; }
 
+    /**
+     * Όταν ο Manager αλλάζει το επίπεδο ρίσκου, πρέπει να
+     * επαναϋπολογιστεί αυτόματα και το Jackpot.
+     */
+    public void setRiskLevel(String riskLevel) {
+        this.riskLevel = riskLevel != null ? riskLevel.toLowerCase() : "low";
+        calculateJackpot();
+    }
 }
