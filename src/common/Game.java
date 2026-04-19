@@ -6,7 +6,7 @@ public class Game implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    // --- 1. Πεδία που διαβάζονται από το JSON ---
+    //pedia pou diavazontai apo to JSON
     private String gameName;
     private String providerName;
     private int stars;
@@ -15,23 +15,22 @@ public class Game implements Serializable {
     private double minBet;
     private double maxBet;
     private String riskLevel;
-    private String hashKey; // Αυτό είναι το Secret S για την επικοινωνία με τον SRG
+    private String hashKey; // Secret S
 
-    // --- 2. Πεδία που υπολογίζονται από το σύστημα ---
+    //pedia pou ypologizontai apo to systhma
     private String betCategory;
     private int jackpot;
 
-    // ΠΡΟΣΘΗΚΗ: Συνολικά κέρδη/ζημιές του συστήματος από αυτό το παιχνίδι
-    private double totalProfit;
+    //statistics
+    private double totalBets;
+    private double totalPayouts;
 
-    // --- 3. Σταθερές: Πίνακες Ρίσκου ---
+    //pinakes riskou
     private static final double[] LOW_RISK = {0.0, 0.0, 0.0, 0.1, 0.5, 1.0, 1.1, 1.3, 2.0, 2.5};
     private static final double[] MEDIUM_RISK = {0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.5, 2.5, 3.5};
     private static final double[] HIGH_RISK = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 6.5};
 
-    /**
-     * Constructor του παιχνιδιού.
-     */
+    //constructor
     public Game(String gameName, String providerName, int stars, int noOfVotes,
                 String gameLogo, double minBet, double maxBet, String riskLevel, String hashKey) {
 
@@ -44,17 +43,14 @@ public class Game implements Serializable {
         this.maxBet = maxBet;
         this.riskLevel = riskLevel != null ? riskLevel.toLowerCase() : "low";
         this.hashKey = hashKey;
-        this.totalProfit = 0.0; // Αρχικά τα κέρδη είναι 0
+
+        this.totalBets = 0.0;
+        this.totalPayouts = 0.0;
 
         calculateBetCategory();
         calculateJackpot();
     }
 
-    /**
-     * Υπολογισμός Κατηγορίας Πονταρίσματος.
-     * Tip: Χρησιμοποιούμε Math.abs για τη σύγκριση double ώστε να αποφύγουμε
-     * προβλήματα ακρίβειας της Java (π.χ. το 0.1 να αποθηκευτεί ως 0.10000000000001).
-     */
     private void calculateBetCategory() {
         if (Math.abs(minBet - 0.1) < 0.001) {
             this.betCategory = "$";
@@ -63,32 +59,19 @@ public class Game implements Serializable {
         } else if (Math.abs(minBet - 5.0) < 0.001) {
             this.betCategory = "$$$";
         } else {
-            this.betCategory = "Unknown"; // Fallback περίπτωση
+            this.betCategory = "Unknown";
         }
     }
 
-    /**
-     * Υπολογισμός του Jackpot βάσει του riskLevel.
-     */
     private void calculateJackpot() {
         switch (this.riskLevel) {
-            case "low":
-                this.jackpot = 10;
-                break;
-            case "medium":
-                this.jackpot = 20;
-                break;
-            case "high":
-                this.jackpot = 40;
-                break;
-            default:
-                this.jackpot = 10; // Default fallback
+            case "low": this.jackpot = 10; break;
+            case "medium": this.jackpot = 20; break;
+            case "high": this.jackpot = 40; break;
+            default: this.jackpot = 10;
         }
     }
 
-    /**
-     * Επιστροφή του σωστού πίνακα ρίσκου.
-     */
     public double[] getRiskArray() {
         switch (this.riskLevel) {
             case "low": return LOW_RISK;
@@ -98,19 +81,22 @@ public class Game implements Serializable {
         }
     }
 
-    // --- ΚΡΙΣΙΜΗ ΠΡΟΣΘΗΚΗ ΓΙΑ ΤΟΝ WORKER ---
-
     /**
-     * Ενημερώνει τα συνολικά κέρδη του παιχνιδιού.
-     * Είναι synchronized επειδή πολλαπλά threads (παίκτες)
-     * μπορεί να ποντάρουν ταυτόχρονα στο ίδιο παιχνίδι!
+     * Synchronized katagrafi neou pontarismatos (polla threads pontaroun tautoxrona)
      */
-    public synchronized void updateProfit(double amount) {
-        this.totalProfit += amount;
+    public synchronized void addBet(double amountBet, double amountWon) {
+        this.totalBets += amountBet;
+        this.totalPayouts += amountWon;
     }
 
-    // --- 4. Getters και Setters ---
+    /**
+     * Ypologismos kerdous / zhmias casino
+     */
+    public synchronized double getCasinoProfit() {
+        return this.totalBets - this.totalPayouts;
+    }
 
+    //getters, setters
     public String getGameName() { return gameName; }
     public String getProviderName() { return providerName; }
     public int getStars() { return stars; }
@@ -121,16 +107,13 @@ public class Game implements Serializable {
     public String getHashKey() { return hashKey; }
     public String getBetCategory() { return betCategory; }
     public int getJackpot() { return jackpot; }
-    public synchronized double getTotalProfit() { return totalProfit; }
-
     public String getRiskLevel() { return riskLevel; }
 
-    /**
-     * Όταν ο Manager αλλάζει το επίπεδο ρίσκου, πρέπει να
-     * επαναϋπολογιστεί αυτόματα και το Jackpot.
-     */
+    public synchronized double getTotalBets() { return totalBets; }
+    public synchronized double getTotalPayouts() { return totalPayouts; }
+
     public void setRiskLevel(String riskLevel) {
         this.riskLevel = riskLevel != null ? riskLevel.toLowerCase() : "low";
-        calculateJackpot();
+        calculateJackpot(); // Αν αλλάξει το ρίσκο, αλλάζει και το jackpot!
     }
 }

@@ -14,10 +14,10 @@ public class ManagerMain {
         String jsonPath = "game_data.json";
 
         try {
-            // 1. Ανάγνωση όλου του αρχείου
+            //reading file
             String content = new String(Files.readAllBytes(Paths.get(jsonPath)));
 
-            // 2. Χειροκίνητο Parsing (Απλό, χωρίς βιβλιοθήκες! 100% Ασφαλές για τον διορθωτή)
+            //parsing json
             String gameName = extractValue(content, "gameName");
             String providerName = extractValue(content, "providerName");
             int stars = Integer.parseInt(extractValue(content, "stars"));
@@ -28,19 +28,25 @@ public class ManagerMain {
             String riskLevel = extractValue(content, "riskLevel");
             String hashKey = extractValue(content, "hashKey");
 
-            // 3. Δημιουργία του αντικειμένου
+            //game object
             Game newGame = new Game(gameName, providerName, stars, noOfVotes,
                     gameLogo, minBet, maxBet, riskLevel, hashKey);
 
             System.out.println("Παιχνίδι έτοιμο: " + newGame.getGameName());
 
-            // 4. Αποστολή μέσω TCP
+            //send object w TCP
             try (Socket socket = new Socket(MASTER_IP, MASTER_PORT);
-                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
+                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) { // <-- Προσθήκη InputStream
+
                 out.flush();
                 out.writeObject(newGame);
                 out.flush();
-                System.out.println("Επιτυχής αποστολή στον Master!");
+                System.out.println("Το παιχνίδι στάλθηκε. Αναμονή απάντησης από Master...");
+
+                //wait for master to confirm or reject
+                String response = in.readUTF();
+                System.out.println("\n[ΜΗΝΥΜΑ ΑΠΟ MASTER]: " + response);
             }
 
         } catch (Exception e) {
@@ -50,7 +56,7 @@ public class ManagerMain {
     }
 
     /**
-     * Βοηθητική μέθοδος που βρίσκει την τιμή ενός κλειδιού μέσα σε ένα απλό JSON string.
+     * Μέθοδος για να βρεθεί η τιμή ενός κλειδιού μέσα σε ένα JSON string.
      */
     private static String extractValue(String json, String key) {
         try {
@@ -58,18 +64,18 @@ public class ManagerMain {
             int startIndex = json.indexOf(searchFor) + searchFor.length();
             int endIndex = json.indexOf(",", startIndex);
 
-            // Αν είναι το τελευταίο στοιχείο, μπορεί να μην έχει κόμμα αλλά αγκύλη '}'
+            //mporei na mhn exei komma alla agkyli an einai to teleutaio stoixeio
             if (endIndex == -1) {
                 endIndex = json.indexOf("}", startIndex);
             }
 
-            // Παίρνουμε την τιμή και καθαρίζουμε τα κενά και τα διπλά εισαγωγικά
+            //cleaning apo kena kai dipla eisagwgika
             String value = json.substring(startIndex, endIndex).trim();
             value = value.replaceAll("\"", "");
 
             return value;
         } catch (Exception e) {
-            return "0"; // Απλό fallback σε περίπτωση λάθους
+            return "0";
         }
     }
 }

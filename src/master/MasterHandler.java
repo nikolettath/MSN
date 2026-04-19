@@ -9,7 +9,7 @@ public class MasterHandler extends Thread {
     private Socket clientSocket;
     private List<WorkerInfo> workers;
 
-    // Πληροφορίες σύνδεσης για τον ξεχωριστό SRG Server (Μέλος 3)
+    //SRG Server info (melos 3)
     private static final String SRG_IP = "localhost";
     private static final int SRG_PORT = 5000;
 
@@ -23,33 +23,33 @@ public class MasterHandler extends Thread {
         try (ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())) {
 
-            // Διαβάζουμε το αντικείμενο που έστειλε ο client
+            //read object from client
             Object request = in.readObject();
 
-            // Αν το αντικείμενο είναι Game, σημαίνει ότι ήρθε από το Manager App (Task 1)
+            //case: object from Manager App
             if (request instanceof Game) {
                 Game game = (Game) request;
                 System.out.println("Ελήφθη νέο παιχνίδι προς καταχώρηση: " + game.getGameName());
 
-                // --- ΒΗΜΑ 1: Ενημέρωση του SRG Server (Ασφάλεια) ---
+                //update SRG server
                 boolean srgRegistered = registerWithSRG(game.getGameName(), game.getHashKey());
 
                 if (!srgRegistered) {
                     out.writeUTF("ΣΦΑΛΜΑ: Ο SRG Server δεν είναι διαθέσιμος. Ακύρωση καταχώρησης.");
                     out.flush();
-                    return; // Σταματάμε τη ροή για να έχουμε συνέπεια στα δεδομένα
+                    return; //Return gia na exoume synepeia sta dedomena
                 }
 
-                // --- ΒΗΜΑ 2: Hashing & Επιλογή Worker (Task 3) ---
+                //hashing & epilogh worker
                 int workerIndex = Math.abs(game.getGameName().hashCode()) % workers.size();
                 WorkerInfo selectedWorker = workers.get(workerIndex);
 
                 System.out.println("Δρομολόγηση του '" + game.getGameName() + "' στον Worker " + workerIndex);
 
-                // --- ΒΗΜΑ 3: Αποστολή του Game στον Worker ---
+                //send game to worker
                 boolean workerSuccess = forwardToWorker(game, selectedWorker);
 
-                // Ενημερώνουμε τον Manager App για την τελική έκβαση
+                //update Manager App
                 if (workerSuccess) {
                     out.writeUTF("ΕΠΙΤΥΧΙΑ: Το παιχνίδι καταχωρήθηκε σωστά στο σύστημα!");
                 } else {
@@ -67,20 +67,19 @@ public class MasterHandler extends Thread {
     }
 
     /**
-     * Ανοίγει socket προς τον SRG Server και του δίνει την εντολή αρχικοποίησης
+     * Ανοίγουμε σύνδεση socket με τον SRG Server για την αποστολή της εντολής init
      */
     private boolean registerWithSRG(String gameName, String hashKey) {
         try (Socket srgSocket = new Socket(SRG_IP, SRG_PORT);
              ObjectOutputStream srgOut = new ObjectOutputStream(srgSocket.getOutputStream());
              ObjectInputStream srgIn = new ObjectInputStream(srgSocket.getInputStream())) {
 
-            // Φτιάχνουμε ένα απλό string μήνυμα/εντολή για τον SRG
             String command = "INIT_GAME|" + gameName + "|" + hashKey;
 
             srgOut.writeUTF(command);
             srgOut.flush();
 
-            // Περιμένουμε το ΟΚ από τον SRG ότι έφτιαξε τα threads του (Producer)
+            //waiting for OK from SRG Server about Producer threads
             String response = srgIn.readUTF();
             return response.equals("OK");
 
@@ -91,7 +90,7 @@ public class MasterHandler extends Thread {
     }
 
     /**
-     * Προωθεί το παιχνίδι στον επιλεγμένο Worker
+     * Προωθούμε το παιχνίδι στον Worker που έχει επιλεγεί
      */
     private boolean forwardToWorker(Game game, WorkerInfo worker) {
         try (Socket workerSocket = new Socket(worker.getIp(), worker.getPort());

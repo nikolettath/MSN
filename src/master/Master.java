@@ -8,12 +8,11 @@ import java.util.List;
 
 public class Master {
     private static final int PORT = 4321;
-    // Λίστα με τις πληροφορίες των Workers (IP και Port)
+    //list with worker IP and Port info
     private List<WorkerInfo> workers;
 
     public Master(int numWorkers) {
         this.workers = new ArrayList<>();
-        // Παράδειγμα: Οι workers τρέχουν σε localhost σε συνεχόμενες θύρες
         for (int i = 0; i < numWorkers; i++) {
             workers.add(new WorkerInfo("127.0.0.1", 8081 + i));
         }
@@ -23,7 +22,6 @@ public class Master {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("Master Node started on port " + PORT);
             while (true) {
-                // Όπως στο ServerMain.java του εργαστηρίου
                 Socket socket = serverSocket.accept();
                 new MasterHandler(socket, workers).start();
             }
@@ -33,7 +31,7 @@ public class Master {
     }
 
     public static void main(String[] args) {
-        int n = 3; // Αριθμός workers (δυναμικός)
+        int n = 3;
         new Master(n).listen();
     }
 }

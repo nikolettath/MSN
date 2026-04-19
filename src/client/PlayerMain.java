@@ -14,17 +14,16 @@ public class PlayerMain {
 
         try (Socket socket = new Socket(MASTER_IP, MASTER_PORT)) {
 
-            // 1. Αρχικοποίηση Streams (SOS: Πάντα πρώτα το Output, μετά flush, μετά το Input!)
+            //arxikopoihsh streams
             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
             out.flush();
             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
-            // 2. Εκκίνηση του Ασύγχρονου Listener (Το Thread μας)
-            // Αυτό το νήμα θα "ακούει" μόνιμα τον Master χωρίς να μπλοκάρει το πληκτρολόγιο!
+            //starting asygxronou listener pou akouei ton master
             ServerListener listener = new ServerListener(in);
             listener.start();
 
-            // 3. Βρόχος διαβάσματος από το πληκτρολόγιο (Main Thread)
+            //reading from keyboard
             Scanner scanner = new Scanner(System.in);
             printMenu();
 
@@ -36,8 +35,7 @@ public class PlayerMain {
                     break;
                 }
 
-                // Στέλνουμε την εντολή στον Master (χρησιμοποιούμε ένα απλό String protocol)
-                // π.χ. "SEARCH|high" ή "BET|SuperSlots|50"
+                //sending to master
                 out.writeUTF("PLAYER_CMD|" + userInput);
                 out.flush();
             }
@@ -55,10 +53,6 @@ public class PlayerMain {
         System.out.print("\n> ");
     }
 
-    /**
-     * Εσωτερική κλάση (Thread) που περιμένει συνεχώς μηνύματα/αποτελέσματα
-     * από τον Master Node, ασύγχρονα.
-     */
     private static class ServerListener extends Thread {
         private final ObjectInputStream in;
 
@@ -70,12 +64,11 @@ public class PlayerMain {
         public void run() {
             try {
                 while (true) {
-                    // Το readUTF() μπλοκάρει μέχρι να έρθει μήνυμα,
-                    // αλλά επειδή είμαστε σε δικό μας Thread, το πληκτρολόγιο συνεχίζει να δουλεύει!
+                    //to keyboard synexizei na doulevei kai as kanei block toreadUTF, giati ine se diko mas thread
                     String response = in.readUTF();
 
                     System.out.println("\n\n[Μήνυμα από Σύστημα]: \n" + response);
-                    System.out.print("> "); // Επαναφορά του κέρσορα για να γράψει ξανά ο χρήστης
+                    System.out.print("> "); //epanafora kersora
                 }
             } catch (IOException e) {
                 System.out.println("\n[!] Η σύνδεση με τον Master τερματίστηκε.");
