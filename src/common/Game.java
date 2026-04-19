@@ -21,6 +21,13 @@ public class Game implements Serializable {
     private String betCategory;
     private int jackpot;
 
+    // statistics
+    private double totalBets;
+    private double totalPayouts;
+    
+    // gia katagrafh kerdous/zhmias kerdos ana paixth -- kleidi = onoma paixth, timh = kerdos kazino (Bets - Payouts)
+    private final Map<String, Double> casinoProfitByPlayer;
+
     //statistics
     private double totalBets;
     private double totalPayouts;
@@ -30,6 +37,7 @@ public class Game implements Serializable {
     private static final double[] MEDIUM_RISK = {0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.5, 2.5, 3.5};
     private static final double[] HIGH_RISK = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 6.5};
 
+    
     //constructor
     public Game(String gameName, String providerName, int stars, int noOfVotes,
                 String gameLogo, double minBet, double maxBet, String riskLevel, String hashKey) {
@@ -47,10 +55,15 @@ public class Game implements Serializable {
         this.totalBets = 0.0;
         this.totalPayouts = 0.0;
 
+        this.totalBets = 0.0;
+        this.totalPayouts = 0.0;
+        this.casinoProfitByPlayer = new HashMap<>();    // arxikopoihsh Map
+        
         calculateBetCategory();
         calculateJackpot();
     }
 
+    
     private void calculateBetCategory() {
         if (Math.abs(minBet - 0.1) < 0.001) {
             this.betCategory = "$";
@@ -63,6 +76,7 @@ public class Game implements Serializable {
         }
     }
 
+    
     private void calculateJackpot() {
         switch (this.riskLevel) {
             case "low": this.jackpot = 10; break;
@@ -72,6 +86,7 @@ public class Game implements Serializable {
         }
     }
 
+    
     public double[] getRiskArray() {
         switch (this.riskLevel) {
             case "low": return LOW_RISK;
@@ -81,21 +96,28 @@ public class Game implements Serializable {
         }
     }
 
-    /**
-     * Synchronized katagrafi neou pontarismatos (polla threads pontaroun tautoxrona)
-     */
-    public synchronized void addBet(double amountBet, double amountWon) {
+    
+    // Synchronized katagrafi neou pontarismatos (polla threads pontaroun tautoxrona)
+    public synchronized void addBet(String playerName, double amountBet, double amountWon) {
+        // enhmerwsh synolikwn statistikwn
         this.totalBets += amountBet;
         this.totalPayouts += amountWon;
+
+        // ypologismos katharou kerdous gia to kazino gia auto to bet
+        double netProfitFromThisBet = amountBet - amountWon;
+
+        // enhmerwsh tou istorikou tou paixth -- an o paixths den yparxei sto map bazei 0.0 arxikh timh kai prosthetei neo kerdos
+        double currentProfit = casinoProfitByPlayer.getOrDefault(playerName, 0.0);
+        casinoProfitByPlayer.put(playerName, currentProfit + netProfitFromThisBet);
     }
 
-    /**
-     * Ypologismos kerdous / zhmias casino
-     */
+    
+    // Ypologismos kerdous / zhmias casino
     public synchronized double getCasinoProfit() {
         return this.totalBets - this.totalPayouts;
     }
 
+    
     //getters, setters
     public String getGameName() { return gameName; }
     public String getProviderName() { return providerName; }
@@ -109,11 +131,18 @@ public class Game implements Serializable {
     public int getJackpot() { return jackpot; }
     public String getRiskLevel() { return riskLevel; }
 
+    //epistrefei antigrafo tou map me ta kerdh ana paixth
+    public synchronized Map<String, Double> getCasinoProfitByPlayer() {
+        return new HashMap<>(casinoProfitByPlayer); 
+    }
+
     public synchronized double getTotalBets() { return totalBets; }
+    
     public synchronized double getTotalPayouts() { return totalPayouts; }
 
+    
     public void setRiskLevel(String riskLevel) {
         this.riskLevel = riskLevel != null ? riskLevel.toLowerCase() : "low";
-        calculateJackpot(); // Αν αλλάξει το ρίσκο, αλλάζει και το jackpot!
+        calculateJackpot();    // an allaxei to risko allazei kai to jackpot
     }
 }
