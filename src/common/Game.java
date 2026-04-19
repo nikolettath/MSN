@@ -6,8 +6,6 @@ import java.util.Map;
 
 public class Game implements Serializable {
 
-    private static final long serialVersionUID = 1L;
-
     //pedia pou diavazontai apo to JSON
     private String gameName;
     private String providerName;
@@ -97,7 +95,8 @@ public class Game implements Serializable {
 
     
     // Synchronized katagrafi neou pontarismatos (polla threads pontaroun tautoxrona)
-    public synchronized void addBet(String playerName, double amountBet, double amountWon) {
+    public synchronized void addBet(String playerName, double amountBet, double amountWon)
+    {
         // enhmerwsh synolikwn statistikwn
         this.totalBets += amountBet;
         this.totalPayouts += amountWon;
@@ -133,15 +132,5 @@ public class Game implements Serializable {
     //epistrefei antigrafo tou map me ta kerdh ana paixth
     public synchronized Map<String, Double> getCasinoProfitByPlayer() {
         return new HashMap<>(casinoProfitByPlayer); 
-    }
-
-    public synchronized double getTotalBets() { return totalBets; }
-    
-    public synchronized double getTotalPayouts() { return totalPayouts; }
-
-    
-    public void setRiskLevel(String riskLevel) {
-        this.riskLevel = riskLevel != null ? riskLevel.toLowerCase() : "low";
-        calculateJackpot();    // an allaxei to risko allazei kai to jackpot
     }
 }

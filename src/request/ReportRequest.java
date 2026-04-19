@@ -17,9 +17,7 @@ public class ReportRequest implements Serializable {
         this.reducerPort = reducerPort;
     }
 
-    public String getReportType() {
-        return reportType;
-    }
+    public String getReportType() { return reportType; }
 
     public String getReducerHost() {
         return reducerHost;

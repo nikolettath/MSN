@@ -18,13 +18,6 @@ public class MemoryStorage {
     }
 
 
-    // game retrieval
-    public synchronized Game getGame(String gameName) {
-
-        return games.get(gameName);
-    }
-
-
     // returns all games
     public synchronized Map<String, Game> getAllGames() {
 

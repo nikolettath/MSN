@@ -1,7 +1,6 @@
 package reducer;
 
 import jobState.JobState;
-import jobState.ReportJobState;
 import monitor.ResultMonitor;
 
 import java.net.Socket;
@@ -12,34 +11,36 @@ public class ReducerMain {
 
     public static void main(String[] args) {
 
-        // dynamically reading port and total number of workers
-        if (args.length < 2) {
-            System.err.println("Use of: java ReducerMain <port> <sum_workers>");
+        // Τώρα διαβάζουμε 5 ορίσματα για να ξέρει ο Reducer πού να στείλει τα αποτελέσματα και τι είδους είναι
+        if (args.length < 5) {
+            System.err.println("Use of: java ReducerMain <port> <sum_workers> <master_ip> <master_port> <is_report(true/false)>");
             System.exit(1);
         }
 
         int port = Integer.parseInt(args[0]);
         int sumWorkers = Integer.parseInt(args[1]);
+        String masterIP = args[2];
+        int masterPort = Integer.parseInt(args[3]);
+        boolean isReport = Boolean.parseBoolean(args[4]);
 
-        // creating shared state for job
+        // 1. Δημιουργούμε ΜΟΝΟ ΕΝΑ ενοποιημένο JobState
         JobState jobState = new JobState(sumWorkers);
-        ReportJobState reportJobState = new ReportJobState(sumWorkers);
 
-        // starting monitor thread to wait for results
-        new ResultMonitor(jobState).start();
+        // 2. Ξεκινάμε το Monitor περνώντας του τα νέα ορίσματα
+        new ResultMonitor(jobState, masterIP, masterPort, isReport).start();
 
         try (ServerSocket serverSocket = new ServerSocket(port))
         {
             System.out.println("Reducer started at port: " + port + "\n");
-            System.out.println("Waiting for " + sumWorkers + " Workers.");
+            System.out.println("Waiting for " + sumWorkers + " Workers. (Report Mode: " + isReport + ")");
 
             while (true)
             {
                 Socket workerSocket = serverSocket.accept();
                 System.out.println("New connection from Worker: " + workerSocket.getInetAddress());
 
-                // for every worker connected we open a ReducerThread
-                ReducerThread t = new ReducerThread(workerSocket, jobState, reportJobState);
+                // 3. Για κάθε worker που συνδέεται, ανοίγουμε ένα ReducerThread περνώντας ΜΟΝΟ το jobState
+                ReducerThread t = new ReducerThread(workerSocket, jobState);
                 t.start();
             }
         } catch (IOException e) {
