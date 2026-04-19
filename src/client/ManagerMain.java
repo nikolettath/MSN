@@ -46,7 +46,7 @@ public class ManagerMain {
                 System.out.println("Το παιχνίδι στάλθηκε. Αναμονή απάντησης από Master...");
 
                 //wait for approval or rejection from Master
-                String response = in.readUTF();
+                String response = (String) in.readObject();
                 System.out.println("\n[ΜΗΝΥΜΑ ΑΠΟ MASTER]: " + response);
 
             } catch (IOException e) {

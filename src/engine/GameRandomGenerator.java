@@ -76,7 +76,7 @@ public class GameRandomGenerator extends Thread {
         String hash = generateHash(number + hashKey);
 
         // Epistrofi tou aithmou kai tou hash ws string me diaxwristiko to komma
-        return number + "," + hash;
+        return number + "|" + hash;
     }
 
     private String generateHash(String input) {

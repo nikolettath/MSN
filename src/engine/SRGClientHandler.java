@@ -16,6 +16,7 @@ public class SRGClientHandler extends Thread {
         this.gameGenerators = gameGenerators;
     }
 
+
     @Override
     public void run() {
         try {
@@ -23,44 +24,51 @@ public class SRGClientHandler extends Thread {
             oos.flush();
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 
-            // Anagnosi aitimatou apo ton client
-            String request = ois.readUTF();
-            String[] tokens = request.split(",");
-            String action = tokens[0];
-            String gameName = tokens[1];
+            // 1. ΑΛΛΑΓΗ: Διαβάζουμε Object αντί για UTF
+            String request = (String) ois.readObject();
 
-            if (action.equals("REGISTER")) {
+            // 2. ΑΛΛΑΓΗ: Ελέγχουμε τι ήρθε πριν κάνουμε split, γιατί
+            // ο Master στέλνει με κόμμα (,) και ο Worker με κάθετο (|)
+            if (request.startsWith("REGISTER")) {
+                String[] tokens = request.split(",");
+                String gameName = tokens[1];
                 String hashKey = tokens[2];
-                // Sygxronismos gia asfali prosvasi kai eggrafi sto shared Map
+
                 synchronized (gameGenerators) {
                     if (!gameGenerators.containsKey(gameName)) {
                         GameRandomGenerator generator = new GameRandomGenerator(gameName, hashKey);
-                        generator.start(); // Ekkinaei to Thread tou Producer
+                        generator.start(); // Ξεκινάει το Thread του Producer
                         gameGenerators.put(gameName, generator);
-                        oos.writeUTF("REGISTERED_OK");
+
+                        // 3. ΑΛΛΑΓΗ: Ο Master περιμένει να ακούσει σκέτο "OK" (με writeObject)
+                        oos.writeObject("OK");
                     } else {
-                        oos.writeUTF("ALREADY_REGISTERED");
+                        oos.writeObject("OK"); // Απαντάμε ΟΚ ακόμα και αν υπάρχει ήδη για να μην κολλήσει ο Master
                     }
                 }
-            } else if (action.equals("REQUEST")) {
+            }
+            else if (request.startsWith("GET_NUMBER")) {
+                // Ο Worker στέλνει: GET_NUMBER|gameName
+                String[] tokens = request.split("\\|");
+                String gameName = tokens[1];
+
                 GameRandomGenerator generator;
                 synchronized (gameGenerators) {
                     generator = gameGenerators.get(gameName);
                 }
 
                 if (generator != null) {
-                    // Lhpsh tou arithmou kai tou hash apo ton Consumer
                     String response = generator.getNextNumberWithHash();
-                    oos.writeUTF(response);
+                    oos.writeObject(response); // ΑΛΛΑΓΗ: writeObject
                 } else {
-                    oos.writeUTF("GAME_NOT_FOUND");
+                    oos.writeObject("GAME_NOT_FOUND"); // ΑΛΛΑΓΗ: writeObject
                 }
             }
 
             oos.flush();
             socket.close();
 
-        } catch (IOException e) {
+        } catch (Exception e) { // Catch γενικό Exception για να πιάσει και το ClassNotFoundException
             e.printStackTrace();
         }
     }

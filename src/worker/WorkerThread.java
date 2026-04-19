@@ -150,6 +150,82 @@ public class WorkerThread extends Thread {
                     output.flush();
                 }
             }
+            // =================================================================
+            // ΛΕΙΤΟΥΡΓΙΑ 4: Λήψη Πονταρίσματος (BET) από τον Master
+            // =================================================================
+            else if (request instanceof String && ((String) request).startsWith("BET|"))
+            {
+                String[] parts = ((String) request).split("\\|");
+                String gameName = parts[1];
+                double betAmount = Double.parseDouble(parts[2]);
+
+                System.out.println("[WORKER] Λήφθηκε ποντάρισμα: " + betAmount + "€ στο παιχνίδι " + gameName);
+
+                // 1. Βρίσκουμε το παιχνίδι στη μνήμη
+                Game game = storage.getGame(gameName);
+                if (game == null) {
+                    output.writeObject("ΣΦΑΛΜΑ: Το παιχνίδι '" + gameName + "' δεν βρέθηκε σε αυτόν τον Worker.");
+                    output.flush();
+                    return;
+                }
+
+                // 2. Επικοινωνία με τον SRG Server για να πάρουμε τον τυχαίο αριθμό
+                // (Υποθέτουμε ότι ο SRG τρέχει στο localhost:9090)
+                int randomNumber = -1;
+                String receivedHash = "";
+
+                try (Socket srgSocket = new Socket("localhost", 9090);
+                     ObjectOutputStream srgOut = new ObjectOutputStream(srgSocket.getOutputStream());
+                     ObjectInputStream srgIn = new ObjectInputStream(srgSocket.getInputStream())) {
+
+                    srgOut.writeObject("GET_NUMBER|" + gameName);
+                    srgOut.flush();
+
+                    // Ο SRG επιστρέφει: "ΑΡΙΘΜΟΣ|HASH"
+                    String srgResponse = (String) srgIn.readObject();
+                    String[] srgParts = srgResponse.split("\\|");
+                    randomNumber = Integer.parseInt(srgParts[0]);
+                    receivedHash = srgParts[1];
+
+                } catch (Exception e) {
+                    output.writeObject("ΣΦΑΛΜΑ: Αποτυχία επικοινωνίας με τη Γεννήτρια Τυχαίων Αριθμών (SRG).");
+                    output.flush();
+                    return;
+                }
+
+                // 3. Επαλήθευση του Hash (Ασφάλεια)
+                // Ο Worker ελέγχει αν το hash που έστειλε ο SRG ταιριάζει με αυτό που περιμένει
+                String expectedHash = hashSHA256(randomNumber + game.getHashKey());
+                if (!expectedHash.equals(receivedHash)) {
+                    output.writeObject("ΣΦΑΛΜΑ ΑΣΦΑΛΕΙΑΣ: Τα δεδομένα από τον SRG παραποιήθηκαν!");
+                    output.flush();
+                    return;
+                }
+
+                // 4. Υπολογισμός Κέρδους / Ζημιάς Παίκτη
+                double playerWinAmount = 0.0;
+
+                // Έλεγχος για Jackpot (modulo 100 == 0)
+                if (randomNumber % 100 == 0) {
+                    playerWinAmount = betAmount * game.getJackpot();
+                    System.out.println("[WORKER] *** JACKPOT ***");
+                } else {
+                    // Κανονικό κέρδος (modulo 10)
+                    int multiplierIndex = randomNumber % 10;
+                    double[] riskArray = game.getRiskArray();
+                    double multiplier = riskArray[multiplierIndex];
+                    playerWinAmount = betAmount * multiplier;
+                }
+
+                // 5. Ασφαλής καταγραφή του πονταρίσματος στο Game (Synchronized)
+                // Επειδή ο Dummy Client δεν στέλνει όνομα, βάζουμε "Player1" προσωρινά
+                game.addBet("Player1", betAmount, playerWinAmount);
+
+                // 6. Επιστροφή αποτελέσματος στον Master (και από εκεί στον Player)
+                String finalMessage = "Αποτέλεσμα Πονταρίσματος: Παίξατε " + betAmount + "€, Κερδίσατε " + playerWinAmount + "€.";
+                output.writeObject(finalMessage);
+                output.flush();
+            }
 
             // --------unknown request----------
             else
@@ -174,6 +250,26 @@ public class WorkerThread extends Thread {
             } catch (IOException e) {
                 System.err.println("[WORKER] Error while closing the socket: " + e.getMessage());
             }
+        }
+    }
+
+
+    /**
+     * Βοηθητική μέθοδος που παράγει το SHA-256 hash ενός κειμένου.
+     */
+    private String hashSHA256(String input) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("Σφάλμα κατά τον υπολογισμό SHA-256", e);
         }
     }
 
