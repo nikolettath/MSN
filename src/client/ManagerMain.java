@@ -13,7 +13,8 @@ public class ManagerMain {
     public static void main(String[] args) {
         String jsonPath = "game_data.json";
 
-        try {
+        try
+        {
             //reading file
             String content = new String(Files.readAllBytes(Paths.get(jsonPath)));
 
@@ -32,10 +33,11 @@ public class ManagerMain {
             Game newGame = new Game(gameName, providerName, stars, noOfVotes,
                     gameLogo, minBet, maxBet, riskLevel, hashKey);
 
-            System.out.println("Παιχνίδι έτοιμο: " + newGame.getGameName());
+            System.out.println("Game ready: " + newGame.getGameName());
 
             //send object w TCP
-            try (Socket socket = new Socket(MASTER_IP, MASTER_PORT)) {
+            try (Socket socket = new Socket(MASTER_IP, MASTER_PORT))
+            {
                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                 out.flush();
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
@@ -43,25 +45,26 @@ public class ManagerMain {
                 //send object
                 out.writeObject(newGame);
                 out.flush();
-                System.out.println("Το παιχνίδι στάλθηκε. Αναμονή απάντησης από Master...");
+                System.out.println("Game was sent. Waiting for response from Master...");
 
                 //wait for approval or rejection from Master
                 String response = (String) in.readObject();
-                System.out.println("\n[ΜΗΝΥΜΑ ΑΠΟ MASTER]: " + response);
+                System.out.println("\n[Message from Master]: " + response);
 
-            } catch (IOException e) {
-                System.err.println("Σφάλμα επικοινωνίας: " + e.getMessage());
+            } catch (IOException e)
+            {
+                System.err.println("Connection error: " + e.getMessage());
                 e.printStackTrace();
             }
-        }catch (Exception e) {
-            System.err.println("Σφάλμα: " + e.getMessage());
+        }catch (Exception e)
+        {
+            System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    /**
-     * Μέθοδος για να βρεθεί η τιμή ενός κλειδιού μέσα σε ένα JSON string.
-     */
+
+    // vriskei thn timh enos kleidiou mesa se JSON string
     private static String extractValue(String json, String key) {
         try {
             String searchFor = "\"" + key + "\":";
@@ -69,7 +72,8 @@ public class ManagerMain {
             int endIndex = json.indexOf(",", startIndex);
 
             //mporei na mhn exei komma alla agkyli an einai to teleutaio stoixeio
-            if (endIndex == -1) {
+            if (endIndex == -1)
+            {
                 endIndex = json.indexOf("}", startIndex);
             }
 
@@ -78,6 +82,7 @@ public class ManagerMain {
             value = value.replaceAll("\"", "");
 
             return value;
+
         } catch (Exception e) {
             return "0";
         }

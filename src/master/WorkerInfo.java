@@ -1,8 +1,7 @@
 package master;
 
 /**
- * Βοηθητική κλάση που αποθηκεύει τα στοιχεία επικοινωνίας (IP, Port)
- * για τον κάθε Worker Node.
+ * vohthitikh klash pou apothhkeuvei ta stoixeia epikoinwnias IP, Port gia kathe Worker node
  */
 public class WorkerInfo {
     private String ip;

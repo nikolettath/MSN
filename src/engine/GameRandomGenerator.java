@@ -9,9 +9,9 @@ import java.util.Random;
 public class GameRandomGenerator extends Thread {
 
     private final String gameName;
-    private final String hashKey; // To secret S tou paixnidiou
+    private final String hashKey;           // To secret S tou paixnidiou
     private final Queue<Integer> buffer;
-    private final int MAX_CAPACITY = 10; // Megisto megethos tou buffer
+    private final int MAX_CAPACITY = 10;    // Megisto megethos tou buffer
     private final Random random;
 
     public GameRandomGenerator(String gameName, String hashKey) {
@@ -21,13 +21,16 @@ public class GameRandomGenerator extends Thread {
         this.random = new Random();
     }
 
+
     // Producer: Paragei tyxaious arithmous kai gemizei ton buffer
     @Override
     public void run() {
-        while (true) {
+        while (true)
+        {
             synchronized (buffer) {
                 // Anamonh otan o buffer einai pliris
-                while (buffer.size() == MAX_CAPACITY) {
+                while (buffer.size() == MAX_CAPACITY)
+                {
                     try {
                         buffer.wait();
                     } catch (InterruptedException e) {
@@ -52,12 +55,14 @@ public class GameRandomGenerator extends Thread {
         }
     }
 
-    // Consumer: Exagogi epomenou arithmou kai dhmiourgia SHA-256 hash
+
+    // Consumer- Exagogi epomenou arithmou kai dhmiourgia SHA-256 hash
     public String getNextNumberWithHash() {
         int number;
         synchronized (buffer) {
             // Anamonh otan o buffer einai adeios
-            while (buffer.isEmpty()) {
+            while (buffer.isEmpty())
+            {
                 try {
                     buffer.wait();
                 } catch (InterruptedException e) {
@@ -79,6 +84,12 @@ public class GameRandomGenerator extends Thread {
         return number + "|" + hash;
     }
 
+
+    /**
+     * Generates a SHA-256 hash for the given input string.
+     * * @param input The original string to be hashed
+     * @return The hexadecimal representation of the generated hash
+     */
     private String generateHash(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -89,6 +100,12 @@ public class GameRandomGenerator extends Thread {
         }
     }
 
+
+    /**
+     * Converts an array of bytes into a hexadecimal string.
+     * * @param hash The byte array to convert
+     * @return A string containing the hexadecimal representation of the bytes
+     */
     private String bytesToHex(byte[] hash) {
         StringBuilder hexString = new StringBuilder(2 * hash.length);
         for (byte b : hash) {

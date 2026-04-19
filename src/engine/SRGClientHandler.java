@@ -1,6 +1,5 @@
 package engine;
 
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -19,36 +18,36 @@ public class SRGClientHandler extends Thread {
 
     @Override
     public void run() {
-        try {
+        try
+        {
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
             oos.flush();
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 
-            // 1. ΑΛΛΑΓΗ: Διαβάζουμε Object αντί για UTF
             String request = (String) ois.readObject();
 
-            // 2. ΑΛΛΑΓΗ: Ελέγχουμε τι ήρθε πριν κάνουμε split, γιατί
-            // ο Master στέλνει με κόμμα (,) και ο Worker με κάθετο (|)
+            // elenxoume ti hrthe prin kanoume split giat o Master stelnei me komma kai o Worker me katheto
             if (request.startsWith("REGISTER")) {
                 String[] tokens = request.split(",");
                 String gameName = tokens[1];
                 String hashKey = tokens[2];
 
                 synchronized (gameGenerators) {
-                    if (!gameGenerators.containsKey(gameName)) {
+                    if (!gameGenerators.containsKey(gameName))
+                    {
                         GameRandomGenerator generator = new GameRandomGenerator(gameName, hashKey);
-                        generator.start(); // Ξεκινάει το Thread του Producer
+                        generator.start();          // Ksekinaei to thread tou producer
                         gameGenerators.put(gameName, generator);
 
-                        // 3. ΑΛΛΑΓΗ: Ο Master περιμένει να ακούσει σκέτο "OK" (με writeObject)
                         oos.writeObject("OK");
                     } else {
-                        oos.writeObject("OK"); // Απαντάμε ΟΚ ακόμα και αν υπάρχει ήδη για να μην κολλήσει ο Master
+                        oos.writeObject("OK");      // Apantame OK akoma kai an uparxei hdh gia na mhn kollhsei o Master
                     }
                 }
             }
-            else if (request.startsWith("GET_NUMBER")) {
-                // Ο Worker στέλνει: GET_NUMBER|gameName
+            else if (request.startsWith("GET_NUMBER"))
+            {
+                // o worker stelnei GET_NUMBER|gameName
                 String[] tokens = request.split("\\|");
                 String gameName = tokens[1];
 
@@ -57,18 +56,20 @@ public class SRGClientHandler extends Thread {
                     generator = gameGenerators.get(gameName);
                 }
 
-                if (generator != null) {
+                if (generator != null)
+                {
                     String response = generator.getNextNumberWithHash();
-                    oos.writeObject(response); // ΑΛΛΑΓΗ: writeObject
-                } else {
-                    oos.writeObject("GAME_NOT_FOUND"); // ΑΛΛΑΓΗ: writeObject
+                    oos.writeObject(response);
+                } else
+                {
+                    oos.writeObject("GAME_NOT_FOUND");
                 }
             }
 
             oos.flush();
             socket.close();
 
-        } catch (Exception e) { // Catch γενικό Exception για να πιάσει και το ClassNotFoundException
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }

@@ -13,7 +13,7 @@ public class SRGServer {
 
     public static void main(String[] args) {
 
-        int port = 9090; // Thira tou SRG Server
+        int port = 9090;    // port tou SRG Server
 
         try (ServerSocket serverSocket = new ServerSocket(port))
         {

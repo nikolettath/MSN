@@ -2,22 +2,23 @@ package master;
 
 import common.Game;
 import request.FilterRequest;
+import request.FinalResponse;
 import request.ReportRequest;
 import java.io.*;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+
 
 public class MasterHandler extends Thread {
+
     private Socket clientSocket;
     private List<WorkerInfo> workers;
 
-    // Σταθερές επικοινωνίας για SRG και Reducer
+    // gia epikoinonia me SRG kai Reducer
     private static final String SRG_IP = "localhost";
     private static final int SRG_PORT = 9090;
 
-    // Ορίζουμε πού τρέχει ο Reducer (χρησιμοποιείται στα requests προς τους Workers)
+    // orizoume pou trexei o reducer - xrhsimopoieitai sta requests pros tous workers)
     private static final String REDUCER_IP = "localhost";
     private static final int REDUCER_PORT = 5000;
 
@@ -26,64 +27,98 @@ public class MasterHandler extends Thread {
         this.workers = workers;
     }
 
+
     @Override
     public void run() {
+
+        // try-with-resources gia automato kleisimo twn streams tou socket
         try (ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-             ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())) {
+             ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream()))
+        {
+            out.flush();
 
-            while (true) {
-                Object request = in.readObject();
+            while (true)
+            {
+                Object request = in.readObject();   // anagnwsh apo to socket ( apo client h apo reducer)
 
-                // ---------------------------------------------------------
-                // 1. ΛΗΨΗ ΑΠΟΤΕΛΕΣΜΑΤΩΝ ΑΠΟ REDUCER (Callback)
-                // ---------------------------------------------------------
-                // Αν ο Reducer συνδεθεί στον Master για να στείλει την τελική λίστα/αναφορά
-                if (request instanceof List || request instanceof Map) {
-                    System.out.println("[MASTER] Λήφθηκαν τελικά συγκεντρωτικά αποτελέσματα από τον Reducer.");
-                    // Εδώ, σε αυτό το στάδιο (Παραδοτέο Α), ο Master απλά επιβεβαιώνει τη λήψη.
-                    continue;
+                // -------------lhpsh final results apo reducer-----------------
+
+                // otan o reducer syndeetai ston master gia na epistrepsei th game list h thn oikonomikh report.
+                if (request instanceof FinalResponse)
+                {
+                    FinalResponse response = (FinalResponse) request;
+                    String id = response.getRequestId();
+                    Object results = response.getResults();
+
+                    ObjectOutputStream playerOut = Master.clientRegistry.get(id);   // anazhthsh arxikou ObjectOutputStream tou client mesw ID
+
+                    if (playerOut != null)
+                    {
+                        // synchronized sto stream gia na einai h eggrafh thread safe
+                        synchronized (playerOut)
+                        {
+                            playerOut.writeObject(results);
+                            playerOut.flush();
+                        }
+                        // afairesi apo to registry meta thn oloklhrwsh ths apostolhs
+                        Master.clientRegistry.remove(id);
+                        System.out.println("[MASTER] Results (ID: " + id + ") forwarded successfully to the client.");
+                    } else
+                    {
+                        System.err.println("[MASTER] Error: Request ID " + id + " not found in Registry.");
+                    }
+                    break;
                 }
 
-                // ---------------------------------------------------------
-                // 2. ΚΑΤΑΧΩΡΗΣΗ ΠΑΙΧΝΙΔΙΟΥ (Από Manager)
-                // ---------------------------------------------------------
-                if (request instanceof Game) {
+                // -----------------kataxwrhsh new game apo manager------------------
+
+                else if (request instanceof Game)
+                {
                     handleNewGame((Game) request, out);
                 }
 
-                // ---------------------------------------------------------
-                // 3. ΕΝΤΟΛΕΣ ΠΑΙΚΤΗ / MANAGER (Strings)
-                // ---------------------------------------------------------
-                else if (request instanceof String) {
+                //---------------entoles player (strings)--------------------------
+
+                else if (request instanceof String)
+                {
                     String command = (String) request;
 
-                    // --- ΛΕΙΤΟΥΡΓΙΑ: ΠΟΝΤΑΡΙΣΜΑ (BET) ---
+                    //----BET----
                     if (command.startsWith("PLAYER_CMD|BET")) {
                         handleBetCommand(command, out);
                     }
 
-                    // --- ΛΕΙΤΟΥΡΓΙΑ: ΑΝΑΖΗΤΗΣΗ (SEARCH - MapReduce) ---
+                    //----SEARCH (MapReduce)----
                     else if (command.startsWith("PLAYER_CMD|SEARCH")) {
                         handleSearchCommand(command, out);
                     }
 
-                    // --- ΛΕΙΤΟΥΡΓΙΑ: ΑΝΑΦΟΡΑ (REPORT - MapReduce) ---
+                    //----REPORT (MapReduce)----
                     else if (command.startsWith("MANAGER_CMD|REPORT")) {
                         handleReportCommand(command, out);
                     }
                 }
             }
         } catch (EOFException e) {
-            System.out.println("Ένας client αποσυνδέθηκε ομαλά.");
+            System.out.println("[MASTER] A client disconnected normally.");
         } catch (Exception e) {
-            System.err.println("Σφάλμα στον Master Handler: " + e.getMessage());
+            System.err.println("[MASTER] Error in MasterHandler: " + e.getMessage());
+            e.printStackTrace();
         } finally {
-            try { clientSocket.close(); } catch (IOException e) { /* Ignore */ }
+            try
+            {
+                if (!clientSocket.isClosed()) {
+                    clientSocket.close();
+                }
+            } catch (IOException e) {
+                // Paravlepsi sfalmatos kata to kleisimo
+            }
         }
     }
 
+
     /**
-     * Υλοποίηση της 2ης Διόρθωσης: Έξυπνο Parse και Broadcast FilterRequest.
+     * Ylopoiisi tis 2is Diorthosis: Eksipno Parse kai Broadcast FilterRequest.
      */
     private void handleSearchCommand(String command, ObjectOutputStream out) throws IOException {
         String[] parts = command.split("\\|");
@@ -93,30 +128,31 @@ public class MasterHandler extends Thread {
         String riskLevel = null;
         String provider = null;
 
-        // Διατρέχουμε τα ορίσματα (αγνοώντας το 1ο που είναι η λέξη "SEARCH")
+        // Parsing twn filtrwn
         for (int i = 1; i < args.length; i++) {
             String arg = args[i];
-
-            // Έλεγχος αν είναι Risk Level
             if (arg.equalsIgnoreCase("low") || arg.equalsIgnoreCase("medium") || arg.equalsIgnoreCase("high")) {
                 riskLevel = arg.toLowerCase();
-            }
-            // Έλεγχος αν είναι Bet Category
-            else if (arg.equals("$") || arg.equals("$$") || arg.equals("$$$")) {
+            } else if (arg.equals("$") || arg.equals("$$") || arg.equals("$$$")) {
                 category = arg;
-            }
-            // Αν δεν είναι τίποτα από τα παραπάνω, το θεωρούμε όνομα Παρόχου (Provider)
-            else {
+            } else {
                 provider = arg;
             }
         }
 
-        System.out.println("[MASTER] Έναρξη SEARCH. Φίλτρα -> Ρίσκο: " + riskLevel + ", Κατηγορία: " + category + ", Πάροχος: " + provider);
 
-        // 1. Δημιουργία του αντικειμένου Request με όλα τα φίλτρα
-        FilterRequest filterReq = new FilterRequest(category, provider, riskLevel, REDUCER_IP, REDUCER_PORT);
+        // Dimiourgoume ena monadiko ID gia afto to sygekrimeno aitima anazitisis
+        String reqId = java.util.UUID.randomUUID().toString();
 
-        // 2. Αποστολή σε ΟΛΟΥΣ τους Workers (Map Phase)
+        // Apothikevoume to ObjectOutputStream tou paikti sto registry tou Master wste na kseroume pou na steiloume ti lista otan tin etoimasei o Reducer
+        Master.clientRegistry.put(reqId, out);
+
+        System.out.println("[MASTER] Starting SEARCH (ID: " + reqId + "). Filters -> Risk: " + riskLevel + ", Category: " + category + ", Provider: " + provider);
+
+        // Dimiourgia tou FilterRequest me to requestId
+        FilterRequest filterReq = new FilterRequest(reqId, category, provider, riskLevel, REDUCER_IP, REDUCER_PORT);
+
+        // Apostoli se OLOUS tous Workers (Map Phase)
         int successCount = 0;
         for (WorkerInfo w : workers) {
             if (sendToWorkerGeneric(filterReq, w)) {
@@ -124,42 +160,53 @@ public class MasterHandler extends Thread {
             }
         }
 
-        out.writeObject("Η αναζήτηση ξεκίνησε. " + successCount + " Workers ανταποκρίθηκαν. " +
-                "Τα αποτελέσματα συγκεντρώνονται στον Reducer.");
-        out.flush();
+        System.out.println("[MASTER] Request distributed to " + successCount + " workers. Waiting for Reducer...");
     }
 
 
     /**
-     * Υλοποίηση Aggregation Query: Broadcast ReportRequest σε όλους τους Workers.
+     * Ylopoiisi Aggregation Query: Broadcast ReportRequest se olous tous Workers.
      */
     private void handleReportCommand(String command, ObjectOutputStream out) throws IOException {
+
         String[] parts = command.split("\\|");
-        String type = parts[1]; // Πρέπει να είναι "BY_PROVIDER" ή "BY_PLAYER" [cite: 91-93]
+        String type = parts[1]; // Prepei na einai "BY_PROVIDER" h' "BY_PLAYER"
 
-        System.out.println("[MASTER] Έναρξη REPORT για: " + type);
+        // Dimiourgoume ena monadiko ID gia afto to sygekrimeno aitima anaforas
+        String reqId = java.util.UUID.randomUUID().toString();
 
-        ReportRequest reportReq = new ReportRequest(type, REDUCER_IP, REDUCER_PORT);
+        // Apothikevoume to ObjectOutputStream sto registry
+        Master.clientRegistry.put(reqId, out);
 
+        System.out.println("[MASTER] Starting REPORT for: " + type + " (ID: " + reqId + ")");
+
+        // Dimiourgia tou ReportRequest me to requestId
+        ReportRequest reportReq = new ReportRequest(reqId, type, REDUCER_IP, REDUCER_PORT);
+
+        // Apostoli se OLOUS tous Workers
+        int successCount = 0;
         for (WorkerInfo w : workers) {
-            sendToWorkerGeneric(reportReq, w);
+            if (sendToWorkerGeneric(reportReq, w)) {
+                successCount++;
+            }
         }
 
-        out.writeObject("Το αίτημα για την οικονομική αναφορά (" + type + ") στάλθηκε για επεξεργασία.");
-        out.flush();
+        System.out.println("[MASTER] Report request distributed to " + successCount + " workers. Waiting for Reducer...");
     }
 
+
     /**
-     * Χειρισμός Πονταρίσματος (Αποστολή σε ΕΝΑΝ συγκεκριμένο Worker βάσει Hash).
+     * Xeirismos Pontarismatos (Apostoli se ENAN sygekrimeno Worker vasei Hash).
      */
     private void handleBetCommand(String command, ObjectOutputStream out) throws IOException, ClassNotFoundException {
+
         String[] parts = command.split("\\|");
         String[] args = parts[1].split(" ");
         String gameName = args[1];
         String betAmount = args[2];
 
-        // Hashing για εύρεση του σωστού Worker [cite: 64-65, 73]
-        int workerIndex = Math.abs(gameName.hashCode()) % workers.size();
+        // Hashing gia evresi tou swstou Worker
+        int workerIndex = (gameName.hashCode() & 0x7FFFFFFF) % workers.size();
         WorkerInfo selectedWorker = workers.get(workerIndex);
 
         try (Socket workerSocket = new Socket(selectedWorker.getIp(), selectedWorker.getPort());
@@ -173,41 +220,44 @@ public class MasterHandler extends Thread {
             out.writeObject(response);
             out.flush();
         } catch (IOException e) {
-            out.writeObject("ΣΦΑΛΜΑ: Ο Worker " + workerIndex + " δεν είναι διαθέσιμος.");
+            out.writeObject("ERROR: Worker " + workerIndex + " is not available.");
             out.flush();
         }
     }
 
     /**
-     * Καταχώρηση νέου παιχνιδιού (SRG Register -> Worker Forward).
+     * Kataxwrisi neou paixnidiou (SRG Register -> Worker Forward).
      */
     private void handleNewGame(Game game, ObjectOutputStream out) throws IOException, ClassNotFoundException {
-        System.out.println("Επεξεργασία νέου παιχνιδιού: " + game.getGameName());
 
-        // 1. Εγγραφή στον SRG [cite: 63, 82]
+        System.out.println("Processing new game: " + game.getGameName());
+
+        // eggrafi ston SRG
         if (!registerWithSRG(game.getGameName(), game.getHashKey())) {
-            out.writeObject("ΣΦΑΛΜΑ: Αποτυχία σύνδεσης με SRG Server.");
+            out.writeObject("ERROR: Failed to connect with SRG Server.");
             out.flush();
             return;
         }
 
-        // 2. Επιλογή Worker βάσει Hash
+        // epilogi Worker vasei Hash
         int workerIndex = Math.abs(game.getGameName().hashCode()) % workers.size();
         WorkerInfo selectedWorker = workers.get(workerIndex);
 
-        // 3. Προώθηση στον Worker
+        // proothisi ston Worker
         if (sendToWorkerGeneric(game, selectedWorker)) {
-            out.writeObject("ΕΠΙΤΥΧΙΑ: Το παιχνίδι '" + game.getGameName() + "' αποθηκεύτηκε στον Worker " + workerIndex);
+            out.writeObject("SUCCESS: Game '" + game.getGameName() + "' saved on Worker " + workerIndex);
         } else {
-            out.writeObject("ΣΦΑΛΜΑ: Αποτυχία αποθήκευσης στον Worker " + workerIndex);
+            out.writeObject("ERROR: Failed to save on Worker " + workerIndex);
         }
         out.flush();
     }
 
+
     /**
-     * Βοηθητική μέθοδος για αποστολή οποιουδήποτε Serializable αντικειμένου σε Worker.
+     * Voithitiki methodos gia apostoli opoioudipote Serializable antikeimenou se Worker.
      */
     private boolean sendToWorkerGeneric(Serializable obj, WorkerInfo worker) {
+
         try (Socket s = new Socket(worker.getIp(), worker.getPort());
              ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
@@ -216,14 +266,20 @@ public class MasterHandler extends Thread {
             out.flush();
 
             Object response = in.readObject();
-            return response != null; // Επιστρέφει true αν ο Worker απάντησε (π.χ. SUCCESS ή MAP_COMPLETED)
+            return response != null; // Epistrefei true an o Worker apantise
         } catch (Exception e) {
-            System.err.println("[MASTER] Αποτυχία επικοινωνίας με Worker στην πόρτα " + worker.getPort());
+            System.err.println("[MASTER] Failed to communicate with Worker on port " + worker.getPort());
             return false;
         }
     }
 
+
+    /**
+     * Voithitiki methodos gia tin eggrafi enos neou paixnidiou ston Secure Random Generator (SRG).
+     * Stelnei to onoma kai to hash key kai perimenei epivevaiosi "OK".
+     */
     private boolean registerWithSRG(String gameName, String hashKey) {
+
         try (Socket srgSocket = new Socket(SRG_IP, SRG_PORT);
              ObjectOutputStream srgOut = new ObjectOutputStream(srgSocket.getOutputStream());
              ObjectInputStream srgIn = new ObjectInputStream(srgSocket.getInputStream())) {

@@ -1,70 +1,71 @@
 package master;
 
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 
 public class Master {
+
     private static final int PORT = 4321;
     private List<WorkerInfo> workers;
 
-    /**
-     * Ο Constructor δέχεται πλέον τη λίστα με τους Workers
-     * που δημιουργήθηκε δυναμικά στη main.
-     */
+    public static final Map<String, ObjectOutputStream> clientRegistry = new ConcurrentHashMap<>();
+
     public Master(List<WorkerInfo> workers) {
         this.workers = workers;
     }
 
+
     public void listen() {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("==============================================");
-            System.out.println("Master Node ξεκίνησε στη θύρα: " + PORT);
-            System.out.println("Συνδεδεμένοι Workers: " + workers.size());
+            System.out.println("Master Node started on port: " + PORT);
+            System.out.println("Connected Workers: " + workers.size());
             for (int i = 0; i < workers.size(); i++) {
                 System.out.println("   Worker " + i + ": " + workers.get(i).getIp() + ":" + workers.get(i).getPort());
             }
-            System.out.println("==============================================");
 
             while (true) {
                 Socket socket = serverSocket.accept();
-                System.out.println("[MASTER] Νέα σύνδεση από client: " + socket.getInetAddress());
+                System.out.println("[MASTER] New client connection from: " + socket.getInetAddress());
 
-                // Δημιουργία νέου thread για κάθε client
+                // dhmiourgia neou thread gia kathe client
                 new MasterHandler(socket, workers).start();
             }
         } catch (IOException e) {
-            System.err.println("Σφάλμα κατά την εκκίνηση του ServerSocket στον Master: " + e.getMessage());
+            System.err.println("Error while starting ServerSocket on Master: " + e.getMessage());
         }
     }
 
-    public static void main(String[] args) {
-        // Έλεγχος αν δόθηκε ο αριθμός των workers ως όρισμα
-        if (args.length < 1) {
-            System.out.println("Χρήση: java master.Master <number_of_workers>");
-            System.out.println("Παράδειγμα: java master.Master 3");
 
-            // Προαιρετικά: Αν δεν δοθούν ορίσματα, μπορούμε να ορίσουμε μια default τιμή
-            // για να διευκολύνουμε τις δοκιμές, αλλά εμφανίζουμε προειδοποίηση.
-            System.out.println("\n[!] Δεν δόθηκαν ορίσματα. Εκκίνηση με default 3 workers.");
+    public static void main(String[] args) {
+
+        // elenxos an dothhke o arithmos twn workers ws orisma
+        if (args.length < 1)
+        {
+            System.out.println("Usage: java master.Master <number_of_workers>");
+            System.out.println("Example: java master.Master 3");
+
+            System.out.println("\n[!] No arguments provided. Starting with default 3 workers.");
             args = new String[]{"3"};
         }
 
         int numWorkers = Integer.parseInt(args[0]);
         List<WorkerInfo> dynamicWorkers = new ArrayList<>();
 
-        // Δυναμική δημιουργία των WorkerInfo.
-        // Εδώ υποθέτουμε ότι οι Workers τρέχουν στο localhost ξεκινώντας από την πόρτα 8081.
-        // Σε μια πραγματική κατανεμημένη εφαρμογή, θα μπορούσαμε να διαβάζουμε
-        // ένα config αρχείο με IP και Ports.
+        // dynamikh dhmiourgia twn WorkerInfo.
+        // ypothetoume oti oi Workers trexoun sto localhost ksekinontas apo to port 8081.
         for (int i = 0; i < numWorkers; i++) {
             int workerPort = 8081 + i;
             dynamicWorkers.add(new WorkerInfo("127.0.0.1", workerPort));
         }
 
-        // Εκκίνηση του Master με τη δυναμική λίστα
+        // ekkinisi tou Master me th dynamic list
         Master master = new Master(dynamicWorkers);
         master.listen();
     }

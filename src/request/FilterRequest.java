@@ -4,17 +4,16 @@ import java.io.Serializable;
 
 public class FilterRequest implements Serializable {
 
-    // filter categories (null means we don't use it for the filtering)
+    private final String requestId;   // monadiko ID aithmatos
     private final String category;    // $, $$, $$$
-    private final String provider;    // π.χ. CasinoTech
+    private final String provider;    // px. CasinoTech
     private final String riskLevel;   // low, medium, high
-
-    // where the worker sends the results / information for reducer
     private final String reducerHost;
     private final int reducerPort;
 
 
-    public FilterRequest(String category, String provider, String riskLevel, String reducerHost, int reducerPort) {
+    public FilterRequest(String requestId, String category, String provider, String riskLevel, String reducerHost, int reducerPort) {
+        this.requestId = requestId;
         this.category = category;
         this.provider = provider;
         this.riskLevel = riskLevel;
@@ -22,23 +21,10 @@ public class FilterRequest implements Serializable {
         this.reducerPort = reducerPort;
     }
 
-    public String getCategory() {
-        return category;
-    }
-
-    public String getProvider() {
-        return provider;
-    }
-
-    public String getRiskLevel() {
-        return riskLevel;
-    }
-
-    public String getReducerHost() {
-        return reducerHost;
-    }
-
-    public int getReducerPort() {
-        return reducerPort;
-    }
+    public String getRequestId() { return requestId; }
+    public String getCategory() { return category; }
+    public String getProvider() { return provider; }
+    public String getRiskLevel() { return riskLevel; }
+    public String getReducerHost() { return reducerHost; }
+    public int getReducerPort() { return reducerPort; }
 }
