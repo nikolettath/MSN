@@ -1,6 +1,8 @@
 package common;
 
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Game implements Serializable {
 
