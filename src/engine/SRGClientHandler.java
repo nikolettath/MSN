@@ -19,8 +19,9 @@ public class SRGClientHandler extends Thread {
     @Override
     public void run() {
         try {
-            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+            oos.flush();
+            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 
             // Anagnosi aitimatou apo ton client
             String request = ois.readUTF();

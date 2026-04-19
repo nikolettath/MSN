@@ -26,6 +26,7 @@ public class PlayRequestHandler extends Thread {
             // Aithma lipsis tyxaiou arithmou apo ton SRG Server
             Socket srgSocket = new Socket("localhost", 9090);
             ObjectOutputStream srgOut = new ObjectOutputStream(srgSocket.getOutputStream());
+            out.flush();
             ObjectInputStream srgIn = new ObjectInputStream(srgSocket.getInputStream());
 
             srgOut.writeUTF("REQUEST," + game.getGameName());

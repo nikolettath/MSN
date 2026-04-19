@@ -11,7 +11,7 @@ public class MasterHandler extends Thread {
 
     //SRG Server info (melos 3)
     private static final String SRG_IP = "localhost";
-    private static final int SRG_PORT = 5000;
+    private static final int SRG_PORT = 9090;
 
     public MasterHandler(Socket socket, List<WorkerInfo> workers) {
         this.clientSocket = socket;
@@ -74,7 +74,7 @@ public class MasterHandler extends Thread {
              ObjectOutputStream srgOut = new ObjectOutputStream(srgSocket.getOutputStream());
              ObjectInputStream srgIn = new ObjectInputStream(srgSocket.getInputStream())) {
 
-            String command = "INIT_GAME|" + gameName + "|" + hashKey;
+            String command = "REGISTER," + gameName + "," + hashKey;
 
             srgOut.writeUTF(command);
             srgOut.flush();
