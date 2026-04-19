@@ -32,7 +32,7 @@ public class FilterRequest implements Serializable {
         return reducerHost;
     }
 
-    public int reducerPort() {
+    public int getReducerPort() {
         return reducerPort;
     }
 }

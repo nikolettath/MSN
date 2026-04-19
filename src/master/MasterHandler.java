@@ -56,8 +56,37 @@ public class MasterHandler extends Thread {
                     out.writeUTF("ΣΦΑΛΜΑ: Ο Worker (" + workerIndex + ") δεν ανταποκρίνεται.");
                 }
                 out.flush();
+
+            } else if (request instanceof String) {
+                String command = (String) request;
+
+                if (command.startsWith("PLAYER_CMD|BET")) {
+                    String[] parts = command.split("\\|");
+                    String[] args = parts[1].split(" ");
+
+                    String gameName = args[1];
+                    String betAmount = args[2];
+
+                    //looking for worker with the same game (idio hashing)
+                    int workerIndex = Math.abs(gameName.hashCode()) % workers.size();
+                    WorkerInfo selectedWorker = workers.get(workerIndex);
+
+                    try (Socket workerSocket = new Socket(selectedWorker.getIp(), selectedWorker.getPort())) {
+                        ObjectOutputStream workerOut = new ObjectOutputStream(workerSocket.getOutputStream());
+                        workerOut.flush();
+                        ObjectInputStream workerIn = new ObjectInputStream(workerSocket.getInputStream());
+
+                        //sending bet to Worker
+                        workerOut.writeObject("BET|" + gameName + "|" + betAmount);
+                        workerOut.flush();
+
+                        //read if won or lost and send result to Player
+                        String workerResponse = (String) workerIn.readObject();
+                        out.writeObject(workerResponse);
+                        out.flush();
+                    }
+                }
             }
-            // TODO: Εδώ αργότερα θα βάλουμε το "else if" για να πιάνουμε τα request από τον Dummy Player
 
         } catch (Exception e) {
             System.err.println("Σφάλμα στον Master Handler: " + e.getMessage());

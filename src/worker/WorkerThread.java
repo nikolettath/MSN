@@ -130,6 +130,26 @@ public class WorkerThread extends Thread {
                 output.writeObject("MAP_REPORT_COMPLETED"); // updating master that worker is finished
                 output.flush();
             }
+            else if (request instanceof String) {
+                String reqStr = (String) request;
+
+                if (reqStr.startsWith("BET|")) {
+                    String[] parts = reqStr.split("\\|");
+                    String gameName = parts[1];
+                    double betAmount = Double.parseDouble(parts[2]);
+
+                    Game game = storage.getGame(gameName);
+
+                    if (game == null) {
+                        output.writeObject("ΣΦΑΛΜΑ: Το παιχνίδι δεν βρέθηκε σε αυτόν τον Worker!");
+                    } else {
+                        // Καλούμε την "καθαρή" λογική του PlayRequestHandler
+                        String result = PlayRequestHandler.processBet(game, betAmount);
+                        output.writeObject(result);
+                    }
+                    output.flush();
+                }
+            }
 
             // --------unknown request----------
             else

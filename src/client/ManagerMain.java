@@ -35,21 +35,25 @@ public class ManagerMain {
             System.out.println("Παιχνίδι έτοιμο: " + newGame.getGameName());
 
             //send object w TCP
-            try (Socket socket = new Socket(MASTER_IP, MASTER_PORT);
-                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) { // <-- Προσθήκη InputStream
-
+            try (Socket socket = new Socket(MASTER_IP, MASTER_PORT)) {
+                ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                 out.flush();
+                ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+
+                //send object
                 out.writeObject(newGame);
                 out.flush();
                 System.out.println("Το παιχνίδι στάλθηκε. Αναμονή απάντησης από Master...");
 
-                //wait for master to confirm or reject
+                //wait for approval or rejection from Master
                 String response = in.readUTF();
                 System.out.println("\n[ΜΗΝΥΜΑ ΑΠΟ MASTER]: " + response);
-            }
 
-        } catch (Exception e) {
+            } catch (IOException e) {
+                System.err.println("Σφάλμα επικοινωνίας: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }catch (Exception e) {
             System.err.println("Σφάλμα: " + e.getMessage());
             e.printStackTrace();
         }

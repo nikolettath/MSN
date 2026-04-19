@@ -16,7 +16,7 @@ public class ResultMonitor extends Thread {
 
 
     // updated constructor to receive data from master
-    public ResultMonitor(JobState jobState, String masterIP, int masterPort) {
+    public ResultMonitor(JobState jobState) {
         this.jobState = jobState;
         this.masterIP = masterIP;
         this.masterPort = masterPort;

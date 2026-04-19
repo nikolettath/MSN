@@ -1,6 +1,7 @@
 package reducer;
 
 import jobState.JobState;
+import jobState.ReportJobState;
 import monitor.ResultMonitor;
 
 import java.net.Socket;
@@ -22,6 +23,7 @@ public class ReducerMain {
 
         // creating shared state for job
         JobState jobState = new JobState(sumWorkers);
+        ReportJobState reportJobState = new ReportJobState(sumWorkers);
 
         // starting monitor thread to wait for results
         new ResultMonitor(jobState).start();
@@ -37,7 +39,7 @@ public class ReducerMain {
                 System.out.println("New connection from Worker: " + workerSocket.getInetAddress());
 
                 // for every worker connected we open a ReducerThread
-                ReducerThread t = new ReducerThread(workerSocket, jobState);
+                ReducerThread t = new ReducerThread(workerSocket, jobState, reportJobState);
                 t.start();
             }
         } catch (IOException e) {

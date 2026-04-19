@@ -35,8 +35,8 @@ public class PlayerMain {
                     break;
                 }
 
-                //sending to master
-                out.writeUTF("PLAYER_CMD|" + userInput);
+                // sending to master
+                out.writeObject("PLAYER_CMD|" + userInput);
                 out.flush();
             }
 
@@ -65,7 +65,7 @@ public class PlayerMain {
             try {
                 while (true) {
                     //to keyboard synexizei na doulevei kai as kanei block toreadUTF, giati ine se diko mas thread
-                    String response = in.readUTF();
+                    String response = (String) in.readObject();
 
                     System.out.println("\n\n[Μήνυμα από Σύστημα]: \n" + response);
                     System.out.print("> "); //epanafora kersora
