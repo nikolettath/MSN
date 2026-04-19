@@ -72,6 +72,8 @@ public class PlayerMain {
                 }
             } catch (IOException e) {
                 System.out.println("\n[!] Η σύνδεση με τον Master τερματίστηκε.");
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
             }
         }
     }

@@ -30,9 +30,6 @@ public class Game implements Serializable {
     // gia katagrafh kerdous/zhmias kerdos ana paixth -- kleidi = onoma paixth, timh = kerdos kazino (Bets - Payouts)
     private final Map<String, Double> casinoProfitByPlayer;
 
-    //statistics
-    private double totalBets;
-    private double totalPayouts;
 
     //pinakes riskou
     private static final double[] LOW_RISK = {0.0, 0.0, 0.0, 0.1, 0.5, 1.0, 1.1, 1.3, 2.0, 2.5};
