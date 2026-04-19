@@ -23,4 +23,10 @@ public class MemoryStorage {
 
         return new HashMap<>(games);    //returns copy to avoid ConcurrentModificationException if another thread adds the game
     }
+
+    // game retrieval (Η μέθοδος που έλειπε)
+    public synchronized Game getGame(String gameName) {
+        return games.get(gameName);
+    }
+
 }
