@@ -56,16 +56,23 @@ public class WorkerThread extends Thread {
                 for (Game g : localGames.values()) {
                     boolean matches = true;
 
-                    // provider check (Χρήση getProviderName() από την κλάση Game)
+                    // provider check
                     if (filter.getProvider() != null && !filter.getProvider().isEmpty()) {
                         if (!filter.getProvider().equalsIgnoreCase(g.getProviderName())) {
                             matches = false;
                         }
                     }
 
-                    // category check (Χρήση getBetCategory() από την κλάση Game)
+                    // category check ($ / $$ / $$$)
                     if (filter.getCategory() != null && !filter.getCategory().isEmpty()) {
                         if (!filter.getCategory().equalsIgnoreCase(g.getBetCategory())) {
+                            matches = false;
+                        }
+                    }
+
+                    // risk level check (low / medium / high)
+                    if (filter.getRiskLevel() != null && !filter.getRiskLevel().isEmpty()) {
+                        if (!filter.getRiskLevel().equalsIgnoreCase(g.getRiskLevel())) {
                             matches = false;
                         }
                     }
@@ -75,7 +82,8 @@ public class WorkerThread extends Thread {
                     }
                 }
 
-                sendToReducer(filter.getReducerHost(), filter.getReducerPort(), result); // sending results to reducer
+                // sending results to reducer
+                sendToReducer(filter.getReducerHost(), filter.getReducerPort(), result);
 
                 output.writeObject("MAP_COMPLETED"); // notifying master that worker has finished its map
                 output.flush();
@@ -150,83 +158,6 @@ public class WorkerThread extends Thread {
                     output.flush();
                 }
             }
-            // =================================================================
-            // ΛΕΙΤΟΥΡΓΙΑ 4: Λήψη Πονταρίσματος (BET) από τον Master
-            // =================================================================
-            else if (request instanceof String && ((String) request).startsWith("BET|"))
-            {
-                String[] parts = ((String) request).split("\\|");
-                String gameName = parts[1];
-                double betAmount = Double.parseDouble(parts[2]);
-
-                System.out.println("[WORKER] Λήφθηκε ποντάρισμα: " + betAmount + "€ στο παιχνίδι " + gameName);
-
-                // 1. Βρίσκουμε το παιχνίδι στη μνήμη
-                Game game = storage.getGame(gameName);
-                if (game == null) {
-                    output.writeObject("ΣΦΑΛΜΑ: Το παιχνίδι '" + gameName + "' δεν βρέθηκε σε αυτόν τον Worker.");
-                    output.flush();
-                    return;
-                }
-
-                // 2. Επικοινωνία με τον SRG Server για να πάρουμε τον τυχαίο αριθμό
-                // (Υποθέτουμε ότι ο SRG τρέχει στο localhost:9090)
-                int randomNumber = -1;
-                String receivedHash = "";
-
-                try (Socket srgSocket = new Socket("localhost", 9090);
-                     ObjectOutputStream srgOut = new ObjectOutputStream(srgSocket.getOutputStream());
-                     ObjectInputStream srgIn = new ObjectInputStream(srgSocket.getInputStream())) {
-
-                    srgOut.writeObject("GET_NUMBER|" + gameName);
-                    srgOut.flush();
-
-                    // Ο SRG επιστρέφει: "ΑΡΙΘΜΟΣ|HASH"
-                    String srgResponse = (String) srgIn.readObject();
-                    String[] srgParts = srgResponse.split("\\|");
-                    randomNumber = Integer.parseInt(srgParts[0]);
-                    receivedHash = srgParts[1];
-
-                } catch (Exception e) {
-                    output.writeObject("ΣΦΑΛΜΑ: Αποτυχία επικοινωνίας με τη Γεννήτρια Τυχαίων Αριθμών (SRG).");
-                    output.flush();
-                    return;
-                }
-
-                // 3. Επαλήθευση του Hash (Ασφάλεια)
-                // Ο Worker ελέγχει αν το hash που έστειλε ο SRG ταιριάζει με αυτό που περιμένει
-                String expectedHash = hashSHA256(randomNumber + game.getHashKey());
-                if (!expectedHash.equals(receivedHash)) {
-                    output.writeObject("ΣΦΑΛΜΑ ΑΣΦΑΛΕΙΑΣ: Τα δεδομένα από τον SRG παραποιήθηκαν!");
-                    output.flush();
-                    return;
-                }
-
-                // 4. Υπολογισμός Κέρδους / Ζημιάς Παίκτη
-                double playerWinAmount = 0.0;
-
-                // Έλεγχος για Jackpot (modulo 100 == 0)
-                if (randomNumber % 100 == 0) {
-                    playerWinAmount = betAmount * game.getJackpot();
-                    System.out.println("[WORKER] *** JACKPOT ***");
-                } else {
-                    // Κανονικό κέρδος (modulo 10)
-                    int multiplierIndex = randomNumber % 10;
-                    double[] riskArray = game.getRiskArray();
-                    double multiplier = riskArray[multiplierIndex];
-                    playerWinAmount = betAmount * multiplier;
-                }
-
-                // 5. Ασφαλής καταγραφή του πονταρίσματος στο Game (Synchronized)
-                // Επειδή ο Dummy Client δεν στέλνει όνομα, βάζουμε "Player1" προσωρινά
-                game.addBet("Player1", betAmount, playerWinAmount);
-
-                // 6. Επιστροφή αποτελέσματος στον Master (και από εκεί στον Player)
-                String finalMessage = "Αποτέλεσμα Πονταρίσματος: Παίξατε " + betAmount + "€, Κερδίσατε " + playerWinAmount + "€.";
-                output.writeObject(finalMessage);
-                output.flush();
-            }
-
             // --------unknown request----------
             else
             {
