@@ -1,67 +1,96 @@
 package client;
 
 import common.Game;
-
 import java.io.*;
 import java.net.Socket;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
-
 public class PlayerMain {
-
-    private static final String MASTER_IP = "localhost";
+    private static final String MASTER_IP = "172.20.10.2";
     private static final int MASTER_PORT = 4321;
-
+    private static String playerName;
 
     public static void main(String[] args) {
-        System.out.println("-----Casino Console App-----");
+        System.out.println("----- Casino Player Console -----");
+        Scanner scanner = new Scanner(System.in);
 
-        try (Socket socket = new Socket(MASTER_IP, MASTER_PORT))
-        {
-            // arxikopoihsh streams
+        System.out.print("Enter your username: ");
+        playerName = scanner.nextLine();
+
+        try (Socket socket = new Socket(MASTER_IP, MASTER_PORT)) {
             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
             out.flush();
             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
-            // starting asygxronou listener pou akouei ton master
             ServerListener listener = new ServerListener(in);
             listener.start();
 
-            // reading apo to keyboard
-            Scanner scanner = new Scanner(System.in);
-            printMenu();
+            while (true) {
+                Thread.sleep(500); // Μικρή παύση για να μην μπερδεύονται τα μενού
+                System.out.println("\n--- Welcome " + playerName + " ---");
+                System.out.println("1. Add Balance");
+                System.out.println("2. Search Games");
+                System.out.println("3. Bet on Game");
+                System.out.println("4. Rate a Game");
+                System.out.println("0. Exit");
+                System.out.print("> ");
 
-            while (true)
-            {
-                String userInput = scanner.nextLine();
+                String choice = scanner.nextLine();
 
-                if (userInput.equalsIgnoreCase("EXIT"))
-                {
-                    System.out.println("Disconnecting...");
-                    break;
+                if (choice.equals("0")) break;
+
+                if (choice.equals("1")) {
+                    System.out.print("Amount to deposit: ");
+                    String amount = scanner.nextLine();
+                    out.writeObject("PLAYER_CMD|ADD_BALANCE|" + playerName + "|" + amount);
+                    out.flush();
                 }
+                else if (choice.equals("2")) {
+                    System.out.print("Risk (low/medium/high/ANY): ");
+                    String risk = scanner.nextLine().trim();
+                    if(risk.isEmpty()) risk = "ANY";
 
-                // stelnei ston master
-                out.writeObject("PLAYER_CMD|" + userInput);
-                out.flush();
+                    System.out.print("Category ($ / $$ / $$$ / ANY): ");
+                    String cat = scanner.nextLine().trim();
+                    if(cat.isEmpty()) cat = "ANY";
+
+                    System.out.print("Provider (e.g. CasinoTech / ANY): ");
+                    String prov = scanner.nextLine().trim();
+                    if(prov.isEmpty()) prov = "ANY";
+
+                    System.out.print("Min Stars (1-5, or 0 for ANY): ");
+                    String strStars = scanner.nextLine();
+                    int stars = strStars.isEmpty() ? 0 : Integer.parseInt(strStars);
+
+                    // Στέλνουμε το νέο Format
+                    out.writeObject("PLAYER_CMD|SEARCH|" + risk + "|" + cat + "|" + prov + "|" + stars);
+                    out.flush();
+                }
+                else if (choice.equals("3")) {
+                    System.out.print("Game name: ");
+                    String gName = scanner.nextLine();
+                    System.out.print("Bet amount: ");
+                    String bet = scanner.nextLine();
+                    // Στέλνουμε και το playerName!
+                    out.writeObject("PLAYER_CMD|BET|" + gName + "|" + bet + "|" + playerName);
+                    out.flush();
+                }
+                else if (choice.equals("4")) {
+                    System.out.print("Game name: ");
+                    String gName = scanner.nextLine();
+                    System.out.print("Stars (1-5): ");
+                    String stars = scanner.nextLine();
+                    out.writeObject("PLAYER_CMD|RATE|" + gName + "|" + stars);
+                    out.flush();
+                }
             }
 
-        } catch (IOException e)
-        {
-            System.err.println("Connection error with Master: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Connection error: " + e.getMessage());
         }
     }
-
-
-    private static void printMenu() {
-        System.out.println("\nAvailable Commands:");
-        System.out.println("- To search: SEARCH <risk_level> (e.g., SEARCH high)");
-        System.out.println("- To bet: BET <game_name> <amount> (e.g., BET SuperSlots 20)");
-        System.out.println("- Exit: EXIT");
-        System.out.print("\n> ");
-    }
-
 
     private static class ServerListener extends Thread {
         private final ObjectInputStream in;
@@ -72,46 +101,29 @@ public class PlayerMain {
 
         @Override
         public void run() {
-            try
-            {
-                while (true)
-                {
-                    // diabazoume ena genikoObject
+            try {
+                while (true) {
                     Object response = in.readObject();
 
-                    // an to apotelesma einai list (px. apo th SEARCH)
-                    if (response instanceof List<?>)
-                    {
+                    if (response instanceof List<?>) {
                         @SuppressWarnings("unchecked")
                         List<Game> games = (List<Game>) response;
-
                         System.out.println("\n\n[Search Results]:");
                         if (games.isEmpty()) {
-                            System.out.println("No games found with the given criteria.");
+                            System.out.println("No games found.");
                         } else {
                             for (Game g : games) {
-                                System.out.println(" • " + g.getGameName() + " (Provider: " + g.getProviderName() +
-                                        ", Category: " + g.getBetCategory() + ", Risk: " + g.getRiskLevel() + ")");
+                                System.out.println(" • " + g.getGameName() + " | Provider: " + g.getProviderName() +
+                                        " | Risk: " + g.getRiskLevel() + " | Stars: " + g.getStars());
                             }
                         }
+                    } else if (response instanceof String) {
+                        System.out.println("\n\n[Message]: " + response);
                     }
-                    // an to apotelesma einai aplo String (px. apotelesma BET h mhnuma lathous)
-                    else if (response instanceof String)
-                    {
-                        System.out.println("\n\n[System message]: \n" + response);
-                    }
-                    // an einai otidhpote allo
-                    else
-                    {
-                        System.out.println("\n\n[System Message]: Unknown data format received.");
-                    }
-
-                    System.out.print("\n> ");   // epanafora kersora
+                    System.out.print("\n> ");
                 }
-            } catch (IOException e) {
-                System.out.println("\n[!] Connection with Master terminated.");
-            } catch (ClassNotFoundException e) {
-                System.err.println("Error: Class not found during reading.");
+            } catch (Exception e) {
+                System.out.println("\n[!] Connection closed.");
             }
         }
     }

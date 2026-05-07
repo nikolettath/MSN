@@ -1,90 +1,107 @@
 package client;
 
 import common.Game;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import java.io.*;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Scanner;
 
 public class ManagerMain {
-    private static final String MASTER_IP = "localhost";
+    private static final String MASTER_IP = "172.20.10.2";
     private static final int MASTER_PORT = 4321;
 
     public static void main(String[] args) {
-        String jsonPath = "game_data.json";
+        System.out.println("----- Manager Console -----");
 
-        try
-        {
-            //reading file
-            String content = new String(Files.readAllBytes(Paths.get(jsonPath)));
+        try (Socket socket = new Socket(MASTER_IP, MASTER_PORT);
+             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
-            //parsing json
-            String gameName = extractValue(content, "gameName");
-            String providerName = extractValue(content, "providerName");
-            int stars = Integer.parseInt(extractValue(content, "stars"));
-            int noOfVotes = Integer.parseInt(extractValue(content, "noOfVotes"));
-            String gameLogo = extractValue(content, "gameLogo");
-            double minBet = Double.parseDouble(extractValue(content, "minBet"));
-            double maxBet = Double.parseDouble(extractValue(content, "maxBet"));
-            String riskLevel = extractValue(content, "riskLevel");
-            String hashKey = extractValue(content, "hashKey");
+            out.flush();
+            Scanner scanner = new Scanner(System.in);
 
-            //game object
-            Game newGame = new Game(gameName, providerName, stars, noOfVotes,
-                    gameLogo, minBet, maxBet, riskLevel, hashKey);
+            while (true) {
+                System.out.println("\n--- Options ---");
+                System.out.println("1. Add Game (from game2.json)");
+                System.out.println("2. Remove Game");
+                System.out.println("3. Edit Game Risk");
+                System.out.println("4. View Report (By Provider)");
+                System.out.println("5. View Report (By Player)");
+                System.out.println("0. Exit");
+                System.out.print("Select: ");
 
-            System.out.println("Game ready: " + newGame.getGameName());
+                String choice = scanner.nextLine();
 
-            //send object w TCP
-            try (Socket socket = new Socket(MASTER_IP, MASTER_PORT))
-            {
-                ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                out.flush();
-                ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                if (choice.equals("0")) break;
 
-                //send object
-                out.writeObject(newGame);
-                out.flush();
-                System.out.println("Game was sent. Waiting for response from Master...");
-
-                //wait for approval or rejection from Master
-                String response = (String) in.readObject();
-                System.out.println("\n[Message from Master]: " + response);
-
-            } catch (IOException e)
-            {
-                System.err.println("Connection error: " + e.getMessage());
-                e.printStackTrace();
+                if (choice.equals("1")) {
+                    addGameAction(out, in);
+                }
+                else if (choice.equals("2")) {
+                    System.out.print("Enter game name to remove: ");
+                    String gName = scanner.nextLine();
+                    out.writeObject("MANAGER_CMD|REMOVE|" + gName);
+                    out.flush();
+                    System.out.println("[Master]: " + in.readObject());
+                }
+                else if (choice.equals("3")) {
+                    System.out.print("Enter game name: ");
+                    String gName = scanner.nextLine();
+                    System.out.print("Enter new risk (low/medium/high): ");
+                    String risk = scanner.nextLine();
+                    out.writeObject("MANAGER_CMD|EDIT_RISK|" + gName + "|" + risk);
+                    out.flush();
+                    System.out.println("[Master]: " + in.readObject());
+                }
+                else if (choice.equals("4")) {
+                    out.writeObject("MANAGER_CMD|REPORT|BY_PROVIDER");
+                    out.flush();
+                    System.out.println("Fetching report... please wait.");
+                    // O Master epistrefei Map<String, Double> meso tou Reducer
+                    Object result = in.readObject();
+                    System.out.println("\n[REPORT BY PROVIDER]:\n" + result);
+                }
+                else if (choice.equals("5")) {
+                    out.writeObject("MANAGER_CMD|REPORT|BY_PLAYER");
+                    out.flush();
+                    System.out.println("Fetching report... please wait.");
+                    Object result = in.readObject();
+                    System.out.println("\n[REPORT BY PLAYER]:\n" + result);
+                }
             }
-        }catch (Exception e)
-        {
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
+
+        } catch (Exception e) {
+            System.err.println("Connection error: " + e.getMessage());
         }
     }
 
-
-    // vriskei thn timh enos kleidiou mesa se JSON string
-    private static String extractValue(String json, String key) {
+    private static void addGameAction(ObjectOutputStream out, ObjectInputStream in) {
         try {
-            String searchFor = "\"" + key + "\":";
-            int startIndex = json.indexOf(searchFor) + searchFor.length();
-            int endIndex = json.indexOf(",", startIndex);
+            String content = new String(Files.readAllBytes(Paths.get("game2.json")));
+            Gson gson = new Gson();
+            JsonObject jsonObject = gson.fromJson(content, JsonObject.class);
 
-            //mporei na mhn exei komma alla agkyli an einai to teleutaio stoixeio
-            if (endIndex == -1)
-            {
-                endIndex = json.indexOf("}", startIndex);
-            }
+            Game newGame = new Game(
+                    jsonObject.get("gameName").getAsString(),
+                    jsonObject.get("providerName").getAsString(),
+                    jsonObject.get("stars").getAsInt(),
+                    jsonObject.get("noOfVotes").getAsInt(),
+                    jsonObject.get("gameLogo").getAsString(),
+                    jsonObject.get("minBet").getAsDouble(),
+                    jsonObject.get("maxBet").getAsDouble(),
+                    jsonObject.get("riskLevel").getAsString(),
+                    jsonObject.get("hashKey").getAsString()
+            );
 
-            //cleaning apo kena kai dipla eisagwgika
-            String value = json.substring(startIndex, endIndex).trim();
-            value = value.replaceAll("\"", "");
-
-            return value;
+            out.writeObject(newGame);
+            out.flush();
+            System.out.println("\n[Master]: " + in.readObject());
 
         } catch (Exception e) {
-            return "0";
+            System.out.println("Failed to load JSON: " + e.getMessage());
         }
     }
 }

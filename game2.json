@@ -1,0 +1,11 @@
+{
+  "gameName": "SuperSlots1111",
+  "providerName": "CasinoTech",
+  "stars": 5,
+  "noOfVotes": 150,
+  "gameLogo": "logo.png",
+  "minBet": 1.0,
+  "maxBet": 50.0,
+  "riskLevel": "high",
+  "hashKey": "secret123"
+}
