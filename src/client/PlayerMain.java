@@ -4,18 +4,17 @@ import common.Game;
 import java.io.*;
 import java.net.Socket;
 import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
 
 public class PlayerMain {
-    private static final String MASTER_IP = "172.20.10.2";
+    private static final String MASTER_IP = "localhost";
     private static final int MASTER_PORT = 4321;
     private static String playerName;
+    public static double localBalance = 0.0; // Τοπικό πορτοφόλι βάσει Q&A
 
     public static void main(String[] args) {
         System.out.println("----- Casino Player Console -----");
         Scanner scanner = new Scanner(System.in);
-
         System.out.print("Enter your username: ");
         playerName = scanner.nextLine();
 
@@ -28,8 +27,8 @@ public class PlayerMain {
             listener.start();
 
             while (true) {
-                Thread.sleep(500); // Μικρή παύση για να μην μπερδεύονται τα μενού
-                System.out.println("\n--- Welcome " + playerName + " ---");
+                Thread.sleep(500);
+                System.out.println("\n--- Welcome " + playerName + " (Balance: " + localBalance + " FUN) ---");
                 System.out.println("1. Add Balance");
                 System.out.println("2. Search Games");
                 System.out.println("3. Bet on Game");
@@ -38,14 +37,13 @@ public class PlayerMain {
                 System.out.print("> ");
 
                 String choice = scanner.nextLine();
-
                 if (choice.equals("0")) break;
 
                 if (choice.equals("1")) {
                     System.out.print("Amount to deposit: ");
-                    String amount = scanner.nextLine();
-                    out.writeObject("PLAYER_CMD|ADD_BALANCE|" + playerName + "|" + amount);
-                    out.flush();
+                    double amount = Double.parseDouble(scanner.nextLine());
+                    localBalance += amount;
+                    System.out.println("Added " + amount + " FUN locally.");
                 }
                 else if (choice.equals("2")) {
                     System.out.print("Risk (low/medium/high/ANY): ");
@@ -64,7 +62,6 @@ public class PlayerMain {
                     String strStars = scanner.nextLine();
                     int stars = strStars.isEmpty() ? 0 : Integer.parseInt(strStars);
 
-                    // Στέλνουμε το νέο Format
                     out.writeObject("PLAYER_CMD|SEARCH|" + risk + "|" + cat + "|" + prov + "|" + stars);
                     out.flush();
                 }
@@ -72,10 +69,15 @@ public class PlayerMain {
                     System.out.print("Game name: ");
                     String gName = scanner.nextLine();
                     System.out.print("Bet amount: ");
-                    String bet = scanner.nextLine();
-                    // Στέλνουμε και το playerName!
-                    out.writeObject("PLAYER_CMD|BET|" + gName + "|" + bet + "|" + playerName);
-                    out.flush();
+                    double bet = Double.parseDouble(scanner.nextLine());
+
+                    if (bet > localBalance) {
+                        System.out.println("ERROR: Insufficient local balance!");
+                    } else {
+                        localBalance -= bet;
+                        out.writeObject("PLAYER_CMD|BET|" + gName + "|" + bet + "|" + playerName);
+                        out.flush();
+                    }
                 }
                 else if (choice.equals("4")) {
                     System.out.print("Game name: ");
@@ -86,7 +88,6 @@ public class PlayerMain {
                     out.flush();
                 }
             }
-
         } catch (Exception e) {
             System.err.println("Connection error: " + e.getMessage());
         }
@@ -94,31 +95,39 @@ public class PlayerMain {
 
     private static class ServerListener extends Thread {
         private final ObjectInputStream in;
-
-        public ServerListener(ObjectInputStream in) {
-            this.in = in;
-        }
+        public ServerListener(ObjectInputStream in) { this.in = in; }
 
         @Override
         public void run() {
             try {
                 while (true) {
                     Object response = in.readObject();
-
                     if (response instanceof List<?>) {
                         @SuppressWarnings("unchecked")
                         List<Game> games = (List<Game>) response;
                         System.out.println("\n\n[Search Results]:");
-                        if (games.isEmpty()) {
-                            System.out.println("No games found.");
-                        } else {
+                        if (games.isEmpty()) System.out.println("No games found.");
+                        else {
                             for (Game g : games) {
                                 System.out.println(" • " + g.getGameName() + " | Provider: " + g.getProviderName() +
-                                        " | Risk: " + g.getRiskLevel() + " | Stars: " + g.getStars());
+                                        " | Risk: " + g.getRiskLevel() + " | Category: " + g.getBetCategory() + " | Stars: " + g.getStars());
                             }
                         }
                     } else if (response instanceof String) {
-                        System.out.println("\n\n[Message]: " + response);
+                        String msg = (String) response;
+                        if (msg.startsWith("PAYOUT_RESULT|")) {
+                            String[] parts = msg.split("\\|");
+                            double wonAmount = Double.parseDouble(parts[1]);
+                            localBalance += wonAmount;
+                            System.out.println("\n\n[Bet Result]: " + parts[2]);
+                        }
+                        else if (msg.startsWith("REFUND|")) {
+                            String[] parts = msg.split("\\|");
+                            localBalance += Double.parseDouble(parts[1]);
+                            System.out.println("\n\n[System Error]: " + parts[2] + " (Bet Refunded)");
+                        } else {
+                            System.out.println("\n\n[Message]: " + msg);
+                        }
                     }
                     System.out.print("\n> ");
                 }

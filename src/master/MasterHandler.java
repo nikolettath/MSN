@@ -9,13 +9,12 @@ import java.net.Socket;
 import java.util.List;
 
 public class MasterHandler extends Thread {
-
     private Socket clientSocket;
     private List<WorkerInfo> workers;
 
+    // Ρυθμίσεις Δικτύου (Localhost για τις δοκιμές σου)
     private static final String SRG_IP = "localhost";
     private static final int SRG_PORT = 9090;
-
     private static final String REDUCER_IP = "localhost";
     private static final int REDUCER_PORT = 5000;
 
@@ -33,11 +32,10 @@ public class MasterHandler extends Thread {
             while (true) {
                 Object request = in.readObject();
 
+                // Διαχείριση απάντησης από τον Reducer (μέσω του Monitor)
                 if (request instanceof FinalResponse) {
                     FinalResponse response = (FinalResponse) request;
                     String id = response.getRequestId();
-                    Object results = response.getResults();
-
                     ObjectOutputStream playerOut;
                     synchronized (Master.clientRegistry) {
                         playerOut = Master.clientRegistry.get(id);
@@ -45,7 +43,7 @@ public class MasterHandler extends Thread {
 
                     if (playerOut != null) {
                         synchronized (playerOut) {
-                            playerOut.writeObject(results);
+                            playerOut.writeObject(response.getResults());
                             playerOut.flush();
                         }
                         synchronized (Master.clientRegistry) {
@@ -54,45 +52,34 @@ public class MasterHandler extends Thread {
                     }
                     break;
                 }
-
+                // Διαχείριση νέου παιχνιδιού από τον Manager
                 else if (request instanceof Game) {
                     handleNewGame((Game) request, out);
                 }
-
+                // Διαχείριση εντολών κειμένου (String)
                 else if (request instanceof String) {
                     String command = (String) request;
 
-                    if (command.startsWith("PLAYER_CMD|BET")) {
-                        handleBetCommand(command, out);
-                    }
-                    else if (command.startsWith("PLAYER_CMD|SEARCH")) {
-                        handleSearchCommand(command, out);
-                    }
-                    else if (command.startsWith("PLAYER_CMD|ADD_BALANCE")) {
-                        handleAddBalanceCommand(command, out);
-                    }
-                    else if (command.startsWith("PLAYER_CMD|RATE")) {
-                        handleRateCommand(command, out);
-                    }
-                    else if (command.startsWith("MANAGER_CMD|REPORT")) {
-                        handleReportCommand(command, out);
-                    }
-                    else if (command.startsWith("MANAGER_CMD|REMOVE")) {
-                        handleRemoveCommand(command, out);
-                    }
-                    else if (command.startsWith("MANAGER_CMD|EDIT_RISK")) {
-                        handleEditRiskCommand(command, out);
-                    }
+                    if (command.startsWith("PLAYER_CMD|BET")) handleBetCommand(command, out);
+                    else if (command.startsWith("PLAYER_CMD|SEARCH")) handleSearchCommand(command, out);
+                    else if (command.startsWith("PLAYER_CMD|RATE")) handleRateCommand(command, out);
+                    else if (command.startsWith("MANAGER_CMD|REPORT")) handleReportCommand(command, out);
+                    else if (command.startsWith("MANAGER_CMD|REMOVE")) handleRemoveCommand(command, out);
+                    else if (command.startsWith("MANAGER_CMD|RESTORE")) handleRestoreCommand(command, out);
+                    else if (command.startsWith("MANAGER_CMD|EDIT_RISK")) handleEditRiskCommand(command, out);
+                    else if (command.startsWith("MANAGER_CMD|EDIT_LIMITS")) handleEditLimitsCommand(command, out);
                 }
             }
         } catch (EOFException e) {
-            // Normal disconnect
+            // Φυσιολογική αποσύνδεση
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             try { if (!clientSocket.isClosed()) clientSocket.close(); } catch (IOException e) { }
         }
     }
+
+    // --- Μέθοδοι Διαχείρισης ---
 
     private void handleSearchCommand(String command, ObjectOutputStream out) throws IOException {
         String[] parts = command.split("\\|");
@@ -102,177 +89,157 @@ public class MasterHandler extends Thread {
         int minStars = Integer.parseInt(parts[5]);
 
         String reqId = java.util.UUID.randomUUID().toString();
-
         synchronized (Master.clientRegistry) {
             Master.clientRegistry.put(reqId, out);
         }
 
         FilterRequest filterReq = new FilterRequest(reqId, category, provider, riskLevel, minStars, REDUCER_IP, REDUCER_PORT);
-
         for (WorkerInfo w : workers) {
             sendToWorkerGeneric(filterReq, w);
         }
     }
 
     private void handleReportCommand(String command, ObjectOutputStream out) throws IOException {
-        String[] parts = command.split("\\|");
-        String type = parts[1];
         String reqId = java.util.UUID.randomUUID().toString();
-
         synchronized (Master.clientRegistry) {
             Master.clientRegistry.put(reqId, out);
         }
-
-        ReportRequest reportReq = new ReportRequest(reqId, type, REDUCER_IP, REDUCER_PORT);
+        ReportRequest reportReq = new ReportRequest(reqId, command.split("\\|")[2], REDUCER_IP, REDUCER_PORT);
         for (WorkerInfo w : workers) {
             sendToWorkerGeneric(reportReq, w);
         }
     }
 
-    private void handleAddBalanceCommand(String command, ObjectOutputStream out) throws IOException {
-        String[] parts = command.split("\\|");
-        String username = parts[2];
-        double amount = Double.parseDouble(parts[3]);
-
-        synchronized (Master.playerBalances) {
-            double current = Master.playerBalances.getOrDefault(username, 0.0);
-            Master.playerBalances.put(username, current + amount);
-            out.writeObject("SUCCESS: Added " + amount + " FUN. New balance: " + (current + amount) + " FUN.");
-            out.flush();
-        }
-    }
-
-    // ==========================================
-    // BONUS: ACTIVE REPLICATION & FAULT TOLERANCE
-    // ==========================================
-
-    private void handleNewGame(Game game, ObjectOutputStream out) throws IOException, ClassNotFoundException {
+    private void handleNewGame(Game game, ObjectOutputStream out) throws IOException {
         if (!registerWithSRG(game.getGameName(), game.getHashKey())) {
             out.writeObject("ERROR: Failed to connect with SRG Server.");
             out.flush();
             return;
         }
 
-        // Υπολογισμός Primary και Replica Worker
         int primaryIndex = (game.getGameName().hashCode() & 0x7FFFFFFF) % workers.size();
-        int replicaIndex = (primaryIndex + 1) % workers.size(); // Ο επόμενος Worker στον κύκλο
+        int replicaIndex = (primaryIndex + 1) % workers.size();
 
-        WorkerInfo primaryWorker = workers.get(primaryIndex);
-        WorkerInfo replicaWorker = workers.get(replicaIndex);
+        boolean primarySuccess = sendToWorkerGeneric(game, workers.get(primaryIndex));
+        boolean replicaSuccess = sendToWorkerGeneric(game, workers.get(replicaIndex));
 
-        boolean primarySuccess = sendToWorkerGeneric(game, primaryWorker);
-        boolean replicaSuccess = sendToWorkerGeneric(game, replicaWorker);
-
-        if (primarySuccess && replicaSuccess) {
-            out.writeObject("SUCCESS: Game '" + game.getGameName() + "' saved on Primary Worker " + primaryIndex + " & Replica Worker " + replicaIndex);
-        } else if (primarySuccess || replicaSuccess) {
-            out.writeObject("WARNING: Game saved on only 1 Worker (Replication failed partially).");
-        } else {
-            out.writeObject("ERROR: Failed to save game on any Worker.");
-        }
+        if (primarySuccess && replicaSuccess) out.writeObject("SUCCESS: Saved on Primary & Replica!");
+        else if (primarySuccess || replicaSuccess) out.writeObject("WARNING: Saved on 1 Worker only.");
+        else out.writeObject("ERROR: Failed to save on any Worker.");
         out.flush();
     }
 
-    // Βοηθητική μέθοδος για να "χτυπάει" τον Primary και αν πέσει να πάει στον Replica (Fault Tolerance)
+    // ----------------------------------------------------
+    // FAULT TOLERANCE & REPLICATION STRATEGIES
+    // ----------------------------------------------------
+
+    /**
+     * Στρατηγική για BET: Ψάχνει τον Primary, αν πέσει πάει στον Replica.
+     * Χρησιμοποιείται για πράξεις που πρέπει να γίνουν ΜΙΑ φορά.
+     */
     private String sendToReplicaGroup(String gameName, String command) {
         int primaryIndex = (gameName.hashCode() & 0x7FFFFFFF) % workers.size();
         int replicaIndex = (primaryIndex + 1) % workers.size();
 
-        WorkerInfo primaryWorker = workers.get(primaryIndex);
-        WorkerInfo replicaWorker = workers.get(replicaIndex);
-
-        // 1η Προσπάθεια: Primary
-        try (Socket workerSocket = new Socket(primaryWorker.getIp(), primaryWorker.getPort());
-             ObjectOutputStream workerOut = new ObjectOutputStream(workerSocket.getOutputStream());
-             ObjectInputStream workerIn = new ObjectInputStream(workerSocket.getInputStream())) {
-
-            workerOut.writeObject(command);
-            workerOut.flush();
-            return (String) workerIn.readObject();
-
+        // 1. Προσπάθεια στον Primary
+        try (Socket s = new Socket(workers.get(primaryIndex).getIp(), workers.get(primaryIndex).getPort());
+             ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+             ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
+            out.writeObject(command);
+            out.flush();
+            return (String) in.readObject();
         } catch (Exception e1) {
-            System.err.println("[MASTER] Primary Worker " + primaryIndex + " is DOWN. Routing to Replica " + replicaIndex + "...");
-
-            // 2η Προσπάθεια: Replica
-            try (Socket workerSocket = new Socket(replicaWorker.getIp(), replicaWorker.getPort());
-                 ObjectOutputStream workerOut = new ObjectOutputStream(workerSocket.getOutputStream());
-                 ObjectInputStream workerIn = new ObjectInputStream(workerSocket.getInputStream())) {
-
-                workerOut.writeObject(command);
-                workerOut.flush();
-                return (String) workerIn.readObject();
-
+            System.err.println("[MASTER] Primary " + primaryIndex + " DOWN. Routing to Replica " + replicaIndex + "...");
+            // 2. Προσπάθεια στον Replica
+            try (Socket s = new Socket(workers.get(replicaIndex).getIp(), workers.get(replicaIndex).getPort());
+                 ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+                 ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
+                out.writeObject(command);
+                out.flush();
+                return (String) in.readObject();
             } catch (Exception e2) {
-                return "ERROR: Both Primary (" + primaryIndex + ") and Replica (" + replicaIndex + ") Workers are offline!";
+                return "ERROR|Both Primary and Replica Workers are offline!";
             }
         }
     }
 
+    /**
+     * Στρατηγική για EDITS/RATINGS: Ενημερώνει ΠΑΝΤΑ και τους δύο Workers.
+     * Λύνει το πρόβλημα που είχες με το "low/high" inconsistency.
+     */
+    private String updateBothReplicas(String gameName, String command) {
+        int primaryIndex = (gameName.hashCode() & 0x7FFFFFFF) % workers.size();
+        int replicaIndex = (primaryIndex + 1) % workers.size();
+
+        String primaryResponse = null;
+        String replicaResponse = null;
+
+        // Ενημέρωση Primary
+        try (Socket s = new Socket(workers.get(primaryIndex).getIp(), workers.get(primaryIndex).getPort());
+             ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+             ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
+            out.writeObject(command); out.flush();
+            primaryResponse = (String) in.readObject();
+        } catch (Exception e) { System.err.println("[MASTER] Primary " + primaryIndex + " is DOWN."); }
+
+        // Ενημέρωση Replica (ΠΑΝΤΑ)
+        try (Socket s = new Socket(workers.get(replicaIndex).getIp(), workers.get(replicaIndex).getPort());
+             ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+             ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
+            out.writeObject(command); out.flush();
+            replicaResponse = (String) in.readObject();
+        } catch (Exception e) { System.err.println("[MASTER] Replica " + replicaIndex + " is DOWN."); }
+
+        if (primaryResponse != null) return primaryResponse;
+        if (replicaResponse != null) return replicaResponse;
+        return "ERROR|Both Primary and Replica Workers are offline!";
+    }
+
+    // --- Command Handlers ---
+
     private void handleRateCommand(String command, ObjectOutputStream out) throws IOException {
-        String gameName = command.split("\\|")[2];
-        String response = sendToReplicaGroup(gameName, command);
-        out.writeObject(response);
-        out.flush();
+        out.writeObject(updateBothReplicas(command.split("\\|")[2], command)); out.flush();
     }
 
     private void handleRemoveCommand(String command, ObjectOutputStream out) throws IOException {
-        String gameName = command.split("\\|")[2];
-        String response = sendToReplicaGroup(gameName, "MANAGER_CMD|REMOVE|" + gameName);
-        out.writeObject(response);
-        out.flush();
+        out.writeObject(updateBothReplicas(command.split("\\|")[2], command)); out.flush();
+    }
+
+    private void handleRestoreCommand(String command, ObjectOutputStream out) throws IOException {
+        out.writeObject(updateBothReplicas(command.split("\\|")[2], command)); out.flush();
     }
 
     private void handleEditRiskCommand(String command, ObjectOutputStream out) throws IOException {
-        String[] parts = command.split("\\|");
-        String gameName = parts[2];
-        String newRisk = parts[3];
-        String response = sendToReplicaGroup(gameName, "MANAGER_CMD|EDIT_RISK|" + gameName + "|" + newRisk);
-        out.writeObject(response);
-        out.flush();
+        out.writeObject(updateBothReplicas(command.split("\\|")[2], command)); out.flush();
+    }
+
+    private void handleEditLimitsCommand(String command, ObjectOutputStream out) throws IOException {
+        out.writeObject(updateBothReplicas(command.split("\\|")[2], command)); out.flush();
     }
 
     private void handleBetCommand(String command, ObjectOutputStream out) throws IOException {
         String[] parts = command.split("\\|");
         String gameName = parts[2];
         double betAmount = Double.parseDouble(parts[3]);
-        String playerName = parts[4];
 
-        // 1. ΕΛΕΓΧΟΣ ΚΑΙ ΑΦΑΙΡΕΣΗ ΥΠΟΛΟΙΠΟΥ
-        synchronized (Master.playerBalances) {
-            double currentBalance = Master.playerBalances.getOrDefault(playerName, 0.0);
-            if (currentBalance < betAmount) {
-                out.writeObject("ERROR: Insufficient funds! Your balance is: " + currentBalance + " FUN");
-                out.flush();
-                return;
-            }
-            Master.playerBalances.put(playerName, currentBalance - betAmount);
-        }
-
-        // 2. Αποστολή στο Replica Group
-        String workerCommand = "BET|" + gameName + "|" + betAmount + "|" + playerName;
+        String workerCommand = "BET|" + gameName + "|" + betAmount + "|" + parts[4];
         String response = sendToReplicaGroup(gameName, workerCommand);
-
-        // 3. ΕΠΙΣΤΡΟΦΗ ΚΕΡΔΩΝ Η REFUND
+// MasterHandler.java - handleBetCommand
         if (response.startsWith("PAYOUT|")) {
             String[] resParts = response.split("\\|");
-            double wonAmount = Double.parseDouble(resParts[1]);
+            double wonAmount = Double.parseDouble(resParts[1]); // Αυτό είναι το συνολικό ποσό επιστροφής
             String msg = resParts[2];
-
-            synchronized (Master.playerBalances) {
-                double currentBalance = Master.playerBalances.get(playerName);
-                Master.playerBalances.put(playerName, currentBalance + wonAmount);
-                out.writeObject(msg + "\n[Wallet Balance: " + (currentBalance + wonAmount) + " FUN]");
-            }
-        } else {
-            // Είτε έγινε λάθος είτε είναι και οι 2 workers down -> Refund
-            synchronized (Master.playerBalances) {
-                double currentBalance = Master.playerBalances.get(playerName);
-                Master.playerBalances.put(playerName, currentBalance + betAmount);
-            }
-            out.writeObject(response.replace("ERROR|", "ERROR: ") + "\n[Bet Refunded]");
+            // Στέλνουμε στον παίκτη το ποσό για να το προσθέσει στο local balance του
+            out.writeObject("PAYOUT_RESULT|" + wonAmount + "|" + msg);
+        }
+         else {
+            // REFUND|ποσό|σφάλμα
+            out.writeObject("REFUND|" + betAmount + "|" + response.replace("ERROR|", ""));
         }
         out.flush();
     }
+
+    // --- Βοηθητικές Μέθοδοι ---
 
     private boolean sendToWorkerGeneric(Serializable obj, WorkerInfo worker) {
         try (Socket s = new Socket(worker.getIp(), worker.getPort());
@@ -280,23 +247,17 @@ public class MasterHandler extends Thread {
              ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
             out.writeObject(obj);
             out.flush();
-            Object response = in.readObject();
-            return response != null;
-        } catch (Exception e) {
-            return false;
-        }
+            return in.readObject() != null;
+        } catch (Exception e) { return false; }
     }
 
     private boolean registerWithSRG(String gameName, String hashKey) {
-        try (Socket srgSocket = new Socket(SRG_IP, SRG_PORT);
-             ObjectOutputStream srgOut = new ObjectOutputStream(srgSocket.getOutputStream());
-             ObjectInputStream srgIn = new ObjectInputStream(srgSocket.getInputStream())) {
-            srgOut.writeObject("REGISTER," + gameName + "," + hashKey);
-            srgOut.flush();
-            String response = (String) srgIn.readObject();
-            return "OK".equals(response);
-        } catch (Exception e) {
-            return false;
-        }
+        try (Socket s = new Socket(SRG_IP, SRG_PORT);
+             ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+             ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
+            out.writeObject("REGISTER," + gameName + "," + hashKey);
+            out.flush();
+            return "OK".equals(in.readObject());
+        } catch (Exception e) { return false; }
     }
 }

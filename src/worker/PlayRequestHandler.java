@@ -12,7 +12,7 @@ public class PlayRequestHandler {
     // Προσθέσαμε το playerName για να περνάει στα στατιστικά του παιχνιδιού
     public static String processBet(Game game, double betAmount, String playerName) {
         try {
-            try (Socket srgSocket = new Socket("172.20.10.2", 9090)) {
+            try (Socket srgSocket = new Socket("localhost", 9090)) {
                 ObjectOutputStream srgOut = new ObjectOutputStream(srgSocket.getOutputStream());
                 srgOut.flush();
                 ObjectInputStream srgIn = new ObjectInputStream(srgSocket.getInputStream());
