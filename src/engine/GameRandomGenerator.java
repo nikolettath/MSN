@@ -9,9 +9,11 @@ import java.util.Random;
 public class GameRandomGenerator extends Thread {
 
     private final String gameName;
-    private final String hashKey;           // To secret S tou paixnidiou
+    // to secret S tou paixnidiou
+    private final String hashKey;
     private final Queue<Integer> buffer;
-    private final int MAX_CAPACITY = 10;    // Megisto megethos tou buffer
+    // megisto megethos tou buffer
+    private final int MAX_CAPACITY = 10;
     private final Random random;
 
     public GameRandomGenerator(String gameName, String hashKey) {
@@ -22,13 +24,13 @@ public class GameRandomGenerator extends Thread {
     }
 
 
-    // Producer: Paragei tyxaious arithmous kai gemizei ton buffer
+    // producer: paragei tyxaious arithmous kai gemizei to buffer
     @Override
     public void run() {
         while (true)
         {
             synchronized (buffer) {
-                // Anamonh otan o buffer einai pliris
+                // anamonh otan to buffer einai gemato
                 while (buffer.size() == MAX_CAPACITY)
                 {
                     try {
@@ -38,15 +40,15 @@ public class GameRandomGenerator extends Thread {
                     }
                 }
 
-                // Paragogi tyxaiou arithmou sto diastima [0, 999]
+                // paragogh tyxaiou arithmou [0, 999]
                 int nextNumber = random.nextInt(1000);
                 buffer.add(nextNumber);
 
-                // Eidopoiisi twn threads pou vriskontai se anamonh
+                // eidopoihsh stous consumers oti prostethike arithmos
                 buffer.notifyAll();
             }
 
-            // Mikri kathysterisi gia beltistopoiisi porwn CPU
+            // mikrh kathysterhsh gia apofygh yperfortwshs CPU
             try {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
@@ -56,11 +58,11 @@ public class GameRandomGenerator extends Thread {
     }
 
 
-    // Consumer- Exagogi epomenou arithmou kai dhmiourgia SHA-256 hash
+    // consumer: exagogh arithmou kai dhmiourgia sha256 hash
     public String getNextNumberWithHash() {
         int number;
         synchronized (buffer) {
-            // Anamonh otan o buffer einai adeios
+            // anamonh otan to buffer einai adeio
             while (buffer.isEmpty())
             {
                 try {
@@ -70,26 +72,22 @@ public class GameRandomGenerator extends Thread {
                 }
             }
 
-            // Exagogi stoixeiou apo tin oura
+            // afairesh tou prwtou stoixeiou apo thn oura
             number = buffer.poll();
 
-            // Eidopoiisi tou producer oti apeutherothike xwros ston buffer
+            // eidopoihsh ston producer oti yparxei diathesimos xwros
             buffer.notifyAll();
         }
 
-        // Dimiourgia tou SHA-256 Hash
+        // dhmiourgia tou sha256 (arithmos + secret)
         String hash = generateHash(number + hashKey);
 
-        // Epistrofi tou aithmou kai tou hash ws string me diaxwristiko to komma
+        // epistrofh apotelesmatos sth morfh: number|hash
         return number + "|" + hash;
     }
 
 
-    /**
-     * Generates a SHA-256 hash for the given input string.
-     * * @param input The original string to be hashed
-     * @return The hexadecimal representation of the generated hash
-     */
+    // metatroph tou input se sha256 hash
     private String generateHash(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -101,11 +99,7 @@ public class GameRandomGenerator extends Thread {
     }
 
 
-    /**
-     * Converts an array of bytes into a hexadecimal string.
-     * * @param hash The byte array to convert
-     * @return A string containing the hexadecimal representation of the bytes
-     */
+    // vohthitikh methodos gia metatroph byte array se hex string
     private String bytesToHex(byte[] hash) {
         StringBuilder hexString = new StringBuilder(2 * hash.length);
         for (byte b : hash) {

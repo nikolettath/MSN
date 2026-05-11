@@ -2,13 +2,14 @@ package request;
 
 import java.io.Serializable;
 
+// klash gia thn apostolh filtrwn anazhthshs apo ton master stous workers
 public class FilterRequest implements Serializable {
 
     private final String requestId;
     private final String category;    // $, $$, $$$
     private final String provider;
     private final String riskLevel;   // low, medium, high
-    private final int minStars;       // ΝΕΟ: Ελάχιστα αστέρια
+    private final int minStars;
     private final String reducerHost;
     private final int reducerPort;
 
@@ -22,6 +23,7 @@ public class FilterRequest implements Serializable {
         this.reducerPort = reducerPort;
     }
 
+    // getters gia thn anagnwsh twn filtrwn apo ton worker
     public String getRequestId() { return requestId; }
     public String getCategory() { return category; }
     public String getProvider() { return provider; }

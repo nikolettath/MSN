@@ -12,7 +12,7 @@ public class MasterHandler extends Thread {
     private Socket clientSocket;
     private List<WorkerInfo> workers;
 
-    // Ρυθμίσεις Δικτύου (Localhost για τις δοκιμές σου)
+    // rythmiseis diktyou
     private static final String SRG_IP = "localhost";
     private static final int SRG_PORT = 9090;
     private static final String REDUCER_IP = "localhost";
@@ -32,7 +32,7 @@ public class MasterHandler extends Thread {
             while (true) {
                 Object request = in.readObject();
 
-                // Διαχείριση απάντησης από τον Reducer (μέσω του Monitor)
+                // diaxeirish apanthshs apo reducer
                 if (request instanceof FinalResponse) {
                     FinalResponse response = (FinalResponse) request;
                     String id = response.getRequestId();
@@ -52,11 +52,11 @@ public class MasterHandler extends Thread {
                     }
                     break;
                 }
-                // Διαχείριση νέου παιχνιδιού από τον Manager
+                // diaxeirish neou paixnidiou
                 else if (request instanceof Game) {
                     handleNewGame((Game) request, out);
                 }
-                // Διαχείριση εντολών κειμένου (String)
+                // diaxeirish entolwn keimenou
                 else if (request instanceof String) {
                     String command = (String) request;
 
@@ -71,7 +71,7 @@ public class MasterHandler extends Thread {
                 }
             }
         } catch (EOFException e) {
-            // Φυσιολογική αποσύνδεση
+            // fysiologikh aposyndesh
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -79,7 +79,7 @@ public class MasterHandler extends Thread {
         }
     }
 
-    // --- Μέθοδοι Διαχείρισης ---
+    // methodoi diaxeirishs
 
     private void handleSearchCommand(String command, ObjectOutputStream out) throws IOException {
         String[] parts = command.split("\\|");
@@ -88,11 +88,13 @@ public class MasterHandler extends Thread {
         String provider = parts[4].equals("ANY") ? null : parts[4];
         int minStars = Integer.parseInt(parts[5]);
 
+        // dhmiourgia monadikou id
         String reqId = java.util.UUID.randomUUID().toString();
         synchronized (Master.clientRegistry) {
             Master.clientRegistry.put(reqId, out);
         }
 
+        // apostolh aithmatos se olous tous workers
         FilterRequest filterReq = new FilterRequest(reqId, category, provider, riskLevel, minStars, REDUCER_IP, REDUCER_PORT);
         for (WorkerInfo w : workers) {
             sendToWorkerGeneric(filterReq, w);
@@ -104,6 +106,8 @@ public class MasterHandler extends Thread {
         synchronized (Master.clientRegistry) {
             Master.clientRegistry.put(reqId, out);
         }
+
+        // apostolh aithmatos report se olous tous workers
         ReportRequest reportReq = new ReportRequest(reqId, command.split("\\|")[2], REDUCER_IP, REDUCER_PORT);
         for (WorkerInfo w : workers) {
             sendToWorkerGeneric(reportReq, w);
@@ -111,12 +115,14 @@ public class MasterHandler extends Thread {
     }
 
     private void handleNewGame(Game game, ObjectOutputStream out) throws IOException {
+        // eggrafh sto srg
         if (!registerWithSRG(game.getGameName(), game.getHashKey())) {
             out.writeObject("ERROR: Failed to connect with SRG Server.");
             out.flush();
             return;
         }
 
+        // ypologismos primary kai replica worker
         int primaryIndex = (game.getGameName().hashCode() & 0x7FFFFFFF) % workers.size();
         int replicaIndex = (primaryIndex + 1) % workers.size();
 
@@ -129,19 +135,14 @@ public class MasterHandler extends Thread {
         out.flush();
     }
 
-    // ----------------------------------------------------
-    // FAULT TOLERANCE & REPLICATION STRATEGIES
-    // ----------------------------------------------------
+    // fault tolerance kai replication
 
-    /**
-     * Στρατηγική για BET: Ψάχνει τον Primary, αν πέσει πάει στον Replica.
-     * Χρησιμοποιείται για πράξεις που πρέπει να γίνουν ΜΙΑ φορά.
-     */
+    // strathgikh bet: primary h replica an pesei
     private String sendToReplicaGroup(String gameName, String command) {
         int primaryIndex = (gameName.hashCode() & 0x7FFFFFFF) % workers.size();
         int replicaIndex = (primaryIndex + 1) % workers.size();
 
-        // 1. Προσπάθεια στον Primary
+        // prospatheia ston primary
         try (Socket s = new Socket(workers.get(primaryIndex).getIp(), workers.get(primaryIndex).getPort());
              ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
@@ -150,7 +151,7 @@ public class MasterHandler extends Thread {
             return (String) in.readObject();
         } catch (Exception e1) {
             System.err.println("[MASTER] Primary " + primaryIndex + " DOWN. Routing to Replica " + replicaIndex + "...");
-            // 2. Προσπάθεια στον Replica
+            // prospatheia ston replica
             try (Socket s = new Socket(workers.get(replicaIndex).getIp(), workers.get(replicaIndex).getPort());
                  ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
                  ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
@@ -163,10 +164,7 @@ public class MasterHandler extends Thread {
         }
     }
 
-    /**
-     * Στρατηγική για EDITS/RATINGS: Ενημερώνει ΠΑΝΤΑ και τους δύο Workers.
-     * Λύνει το πρόβλημα που είχες με το "low/high" inconsistency.
-     */
+    // strathgikh enhmerwshs: kai stous dyo workers
     private String updateBothReplicas(String gameName, String command) {
         int primaryIndex = (gameName.hashCode() & 0x7FFFFFFF) % workers.size();
         int replicaIndex = (primaryIndex + 1) % workers.size();
@@ -174,7 +172,7 @@ public class MasterHandler extends Thread {
         String primaryResponse = null;
         String replicaResponse = null;
 
-        // Ενημέρωση Primary
+        // enhmerwsh primary
         try (Socket s = new Socket(workers.get(primaryIndex).getIp(), workers.get(primaryIndex).getPort());
              ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
@@ -182,7 +180,7 @@ public class MasterHandler extends Thread {
             primaryResponse = (String) in.readObject();
         } catch (Exception e) { System.err.println("[MASTER] Primary " + primaryIndex + " is DOWN."); }
 
-        // Ενημέρωση Replica (ΠΑΝΤΑ)
+        // enhmerwsh replica
         try (Socket s = new Socket(workers.get(replicaIndex).getIp(), workers.get(replicaIndex).getPort());
              ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
@@ -195,7 +193,7 @@ public class MasterHandler extends Thread {
         return "ERROR|Both Primary and Replica Workers are offline!";
     }
 
-    // --- Command Handlers ---
+    // command handlers
 
     private void handleRateCommand(String command, ObjectOutputStream out) throws IOException {
         out.writeObject(updateBothReplicas(command.split("\\|")[2], command)); out.flush();
@@ -224,22 +222,23 @@ public class MasterHandler extends Thread {
 
         String workerCommand = "BET|" + gameName + "|" + betAmount + "|" + parts[4];
         String response = sendToReplicaGroup(gameName, workerCommand);
-// MasterHandler.java - handleBetCommand
+
         if (response.startsWith("PAYOUT|")) {
             String[] resParts = response.split("\\|");
-            double wonAmount = Double.parseDouble(resParts[1]); // Αυτό είναι το συνολικό ποσό επιστροφής
+            // synoliko poso epistrofhs
+            double wonAmount = Double.parseDouble(resParts[1]);
             String msg = resParts[2];
-            // Στέλνουμε στον παίκτη το ποσό για να το προσθέσει στο local balance του
+            // apostolh apotelesmatos ston paikth
             out.writeObject("PAYOUT_RESULT|" + wonAmount + "|" + msg);
         }
-         else {
-            // REFUND|ποσό|σφάλμα
+        else {
+            // epistrofh xrhmatwn se sfalma
             out.writeObject("REFUND|" + betAmount + "|" + response.replace("ERROR|", ""));
         }
         out.flush();
     }
 
-    // --- Βοηθητικές Μέθοδοι ---
+    // voithitikes methodoi
 
     private boolean sendToWorkerGeneric(Serializable obj, WorkerInfo worker) {
         try (Socket s = new Socket(worker.getIp(), worker.getPort());

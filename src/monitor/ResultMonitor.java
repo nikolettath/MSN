@@ -16,7 +16,7 @@ public class ResultMonitor extends Thread {
     private final String masterIP;
     private final int masterPort;
 
-    // ΑΛΛΑΓΗ 1: Αφαιρέθηκε το boolean isReport από τον constructor
+    // arxikopoihsh tou monitor me ta aparaithta stoixeia
     public ResultMonitor(JobState jobState, String masterIP, int masterPort) {
         this.jobState = jobState;
         this.masterIP = masterIP;
@@ -27,10 +27,10 @@ public class ResultMonitor extends Thread {
     @SuppressWarnings("unchecked")
     public void run() {
         try {
-            // ΑΛΛΑΓΗ 2: Καλούμε μια κοινή μέθοδο που περιμένει και επιστρέφει το τελικό Object
+            // anamonh gia thn oloklhrwsh kai lhpsh twn telikwn dedomenwn
             Object finalResults = jobState.waitForCompletion();
 
-            // Έξυπνος έλεγχος: Αν είναι Map, το κάνουμε ένα ωραίο String (Report)
+            // an prokeitai gia oikonomiko report (Map), ftiakxnei to teliko keimeno
             if (finalResults instanceof Map<?, ?>) {
                 Map<String, Double> map = (Map<String, Double>) finalResults;
                 StringBuilder sb = new StringBuilder();
@@ -41,12 +41,12 @@ public class ResultMonitor extends Thread {
 
                 sendResults(sb.toString());
             }
-            // Έξυπνος έλεγχος: Αν είναι List, το στέλνουμε όπως είναι (Search)
+            // an prokeitai gia apotelesmata anazhthshs (List), stelnei th lista ws exei
             else {
                 sendResults(finalResults);
             }
 
-            // afairesh JobState apo th mnhmh tou ReducerMain me asfaleia
+            // afairesh tou jobState apo th lista energwn jobs tou reducer
             synchronized (ReducerMain.activeJobs) {
                 ReducerMain.activeJobs.remove(jobState.getRequestId());
             }
@@ -56,12 +56,13 @@ public class ResultMonitor extends Thread {
         }
     }
 
+    // methodos gia thn apostolh ths telikhs apanthshs ston master
     private void sendResults(Object results) {
         try (Socket s = new Socket(masterIP, masterPort);
              ObjectOutputStream output = new ObjectOutputStream(s.getOutputStream());
              ObjectInputStream input = new ObjectInputStream(s.getInputStream())) {
 
-            // stelnei to ID kai ta apotelesmata
+            // apostolh monadikou id kai twn apotelesmatwn
             String id = jobState.getRequestId();
             output.writeObject(new FinalResponse(id, results));
             output.flush();

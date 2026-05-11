@@ -5,26 +5,23 @@ import java.util.HashMap;
 
 public class MemoryStorage {
 
-    private final Map<String, Game> games = new HashMap<>();    // keeps games sth kyria mnhmh
+    // domh dedomenwn gia apothhkeysh paixnidiwn sth mnhmh (RAM) tou worker
+    private final Map<String, Game> games = new HashMap<>();
 
-
-    // prosthetei game me synchronization
+    // prosthkh h enhmerwsh paixnidiou me asfaleia
     public synchronized void addGame(Game game) {
-
         games.put(game.getGameName(), game);
         System.out.println("[STORAGE] Added the game: " + game.getGameName());
     }
 
-
-    // epistrefei ola ta games
+    // epistrofh olwn twn paixnidiwn
     public synchronized Map<String, Game> getAllGames() {
-
-        return new HashMap<>(games);    // epistrefei antigrafo gia apofygh ConcurrentModificationException an kapoio allo thread prosthesei to game
+        // epistrefei antigrafo gia na mhn ephreastei to map an allaksei kata th xrhsh tou
+        return new HashMap<>(games);
     }
 
-    // game retrieval
+    // eyresh kai epistrofh sygkekrimenou paixnidiou mesw tou onomatos tou
     public synchronized Game getGame(String gameName) {
         return games.get(gameName);
     }
-
 }

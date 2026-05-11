@@ -10,7 +10,7 @@ public class WorkerMain {
 
     public static void main(String[] args) {
 
-        // dynamically appointing of port during initialization
+        // dymanikh apodosh ths portas kata thn ekkinhsh
         if (args.length < 1) {
             System.err.println("Use of: java WorkerMain <port>");
             System.exit(1);
@@ -18,21 +18,21 @@ public class WorkerMain {
 
         int port = Integer.parseInt(args[0]);
 
-        // creating shared memory storage for worker
+        // dhmiourgia koinhs mnhmhs (RAM storage) gia ton worker
         MemoryStorage ms = new MemoryStorage();
 
-        // starting ServerSocket
+        // ekkinhsh tou tcp server gia ton worker
         try (ServerSocket serverSocket = new ServerSocket(port))
         {
             System.out.println("Worker successfully started at port: " + port);
 
-            // endless loop to constantly receive requests
+            // loop gia thn apodoxh aithmatwn apo ton master
             while (true)
             {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("New connection from Master: " + clientSocket.getInetAddress());
 
-                // for every request (client) open new thread
+                // dhmiourgia neou thread gia thn eksyphrethsh kathe aithmatos
                 WorkerThread t = new WorkerThread(clientSocket, ms);
                 t.start();
             }

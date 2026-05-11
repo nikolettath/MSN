@@ -1,8 +1,6 @@
 package master;
 
-/**
- * vohthitikh klash pou apothhkeuvei ta stoixeia epikoinwnias IP, Port gia kathe Worker node
- */
+// vohthitikh klash gia apothhkeysh stoixeiwn epikoinwnias (ip, port) tou kathe worker
 public class WorkerInfo {
     private String ip;
     private int port;
