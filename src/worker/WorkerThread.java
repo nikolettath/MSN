@@ -24,17 +24,20 @@ public class WorkerThread extends Thread {
             output.flush();
             Object request = input.readObject();
 
+            // apothhkeysh neou paixnidiou
             if (request instanceof Game) {
                 storage.addGame((Game) request);
                 output.writeObject("SUCCESS: Game saved successfully.");
                 output.flush();
             }
+            // ektelesh map phase gia anazhthsh me filtra
             else if (request instanceof FilterRequest) {
                 FilterRequest filter = (FilterRequest) request;
                 List<Game> result = new ArrayList<>();
                 for (Game g : storage.getAllGames().values()) {
-                    if (!g.isActive()) continue;
+                    if (!g.isActive()) continue; // soft delete elegxos
                     boolean matches = true;
+                    // efarmogh filtrwn
                     if (filter.getProvider() != null && !filter.getProvider().equals("ANY") && !filter.getProvider().equalsIgnoreCase(g.getProviderName())) matches = false;
                     if (filter.getCategory() != null && !filter.getCategory().equals("ANY") && !filter.getCategory().equalsIgnoreCase(g.getBetCategory())) matches = false;
                     if (filter.getRiskLevel() != null && !filter.getRiskLevel().equals("ANY") && !filter.getRiskLevel().equalsIgnoreCase(g.getRiskLevel())) matches = false;
@@ -42,29 +45,37 @@ public class WorkerThread extends Thread {
 
                     if (matches) result.add(g);
                 }
+                // apostolh topikou apotelesmatos ston reducer
                 sendToReducer(filter.getReducerHost(), filter.getReducerPort(), filter.getRequestId(), result);
                 output.writeObject("MAP_COMPLETED");
                 output.flush();
             }
+            // ektelesh map phase gia oikonomika statistika
             else if (request instanceof ReportRequest) {
                 ReportRequest reportReq = (ReportRequest) request;
                 Map<String, Double> partReport = new HashMap<>();
                 for (Game g : storage.getAllGames().values()) {
+                    // omadopoihsh ana paroxo
                     if ("BY_PROVIDER".equals(reportReq.getReportType())) {
                         partReport.put(g.getProviderName(), partReport.getOrDefault(g.getProviderName(), 0.0) + g.getCasinoProfit());
-                    } else if ("BY_PLAYER".equals(reportReq.getReportType())) {
+                    }
+                    // omadopoihsh ana paikth
+                    else if ("BY_PLAYER".equals(reportReq.getReportType())) {
                         for (Map.Entry<String, Double> entry : g.getCasinoProfitByPlayer().entrySet()) {
                             partReport.put(entry.getKey(), partReport.getOrDefault(entry.getKey(), 0.0) + entry.getValue());
                         }
                     }
                 }
+                // apostolh topikou map ston reducer
                 sendToReducer(reportReq.getReducerHost(), reportReq.getReducerPort(), reportReq.getRequestId(), partReport);
                 output.writeObject("MAP_REPORT_COMPLETED");
                 output.flush();
             }
+            // diaxeirish entolwn string (bet, edit, remove)
             else if (request instanceof String) {
                 String reqStr = (String) request;
 
+                // ektelesh pontarismatos
                 if (reqStr.startsWith("BET|")) {
                     String[] parts = reqStr.split("\\|");
                     Game game = storage.getGame(parts[1]);
@@ -72,6 +83,7 @@ public class WorkerThread extends Thread {
                     else output.writeObject("PAYOUT|" + PlayRequestHandler.processBet(game, Double.parseDouble(parts[2]), parts[3]));
                     output.flush();
                 }
+                // prosthkh vathmologias
                 else if (reqStr.startsWith("PLAYER_CMD|RATE|")) {
                     String[] parts = reqStr.split("\\|");
                     Game game = storage.getGame(parts[2]);
@@ -81,18 +93,21 @@ public class WorkerThread extends Thread {
                     } else output.writeObject("ERROR|Game not found.");
                     output.flush();
                 }
+                // apenergopoihsh paixnidiou (soft delete)
                 else if (reqStr.startsWith("MANAGER_CMD|REMOVE|")) {
                     Game game = storage.getGame(reqStr.split("\\|")[2]);
                     if (game != null) { game.setActive(false); output.writeObject("SUCCESS: Game removed."); }
                     else output.writeObject("ERROR|Game not found.");
                     output.flush();
                 }
+                // epanafora paixnidiou
                 else if (reqStr.startsWith("MANAGER_CMD|RESTORE|")) {
                     Game game = storage.getGame(reqStr.split("\\|")[2]);
                     if (game != null) { game.setActive(true); output.writeObject("SUCCESS: Game restored."); }
                     else output.writeObject("ERROR|Game not found.");
                     output.flush();
                 }
+                // allagh epipedou riskou
                 else if (reqStr.startsWith("MANAGER_CMD|EDIT_RISK|")) {
                     String[] parts = reqStr.split("\\|");
                     Game game = storage.getGame(parts[2]);
@@ -100,6 +115,7 @@ public class WorkerThread extends Thread {
                     else output.writeObject("ERROR|Game not found.");
                     output.flush();
                 }
+                // allagh oriwn pontarismatos
                 else if (reqStr.startsWith("MANAGER_CMD|EDIT_LIMITS|")) {
                     String[] parts = reqStr.split("\\|");
                     Game game = storage.getGame(parts[2]);
@@ -114,6 +130,7 @@ public class WorkerThread extends Thread {
         finally { try { if (socket != null) socket.close(); } catch (IOException e) {} }
     }
 
+    // apostolh topikwn dedomenwn ston reducer gia th fash tou reduction
     private void sendToReducer(String host, int port, String id, Object data) {
         try (Socket s = new Socket(host, port); ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream())) {
             out.writeObject(new Object[]{id, data}); out.flush();

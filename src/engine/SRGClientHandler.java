@@ -26,7 +26,7 @@ public class SRGClientHandler extends Thread {
 
             String request = (String) ois.readObject();
 
-            // elenxoume ti hrthe prin kanoume split giat o Master stelnei me komma kai o Worker me katheto
+            // elegxos aithmatos (diaforetiko format master/worker)
             if (request.startsWith("REGISTER")) {
                 String[] tokens = request.split(",");
                 String gameName = tokens[1];
@@ -36,18 +36,20 @@ public class SRGClientHandler extends Thread {
                     if (!gameGenerators.containsKey(gameName))
                     {
                         GameRandomGenerator generator = new GameRandomGenerator(gameName, hashKey);
-                        generator.start();          // Ksekinaei to thread tou producer
+                        // ksekinhma tou producer thread
+                        generator.start();
                         gameGenerators.put(gameName, generator);
 
                         oos.writeObject("OK");
                     } else {
-                        oos.writeObject("OK");      // Apantame OK akoma kai an uparxei hdh gia na mhn kollhsei o Master
+                        // apanthsh OK estw ki an yparxei hdh
+                        oos.writeObject("OK");
                     }
                 }
             }
             else if (request.startsWith("GET_NUMBER"))
             {
-                // o worker stelnei GET_NUMBER|gameName
+                // aithma worker me format GET_NUMBER|gameName
                 String[] tokens = request.split("\\|");
                 String gameName = tokens[1];
 

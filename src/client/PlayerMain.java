@@ -10,7 +10,8 @@ public class PlayerMain {
     private static final String MASTER_IP = "localhost";
     private static final int MASTER_PORT = 4321;
     private static String playerName;
-    public static double localBalance = 0.0; // Τοπικό πορτοφόλι βάσει Q&A
+    // topiko portofoli paikth
+    public static double localBalance = 0.0;
 
     public static void main(String[] args) {
         System.out.println("----- Casino Player Console -----");
@@ -18,14 +19,17 @@ public class PlayerMain {
         System.out.print("Enter your username: ");
         playerName = scanner.nextLine();
 
+        // syndesh me Master mesw TCP socket
         try (Socket socket = new Socket(MASTER_IP, MASTER_PORT)) {
             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
             out.flush();
             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
+            // thread gia asygxronh lhpsh apanthsewn
             ServerListener listener = new ServerListener(in);
             listener.start();
 
+            // loop tou menou
             while (true) {
                 Thread.sleep(500);
                 System.out.println("\n--- Welcome " + playerName + " (Balance: " + localBalance + " FUN) ---");
@@ -46,6 +50,7 @@ public class PlayerMain {
                     System.out.println("Added " + amount + " FUN locally.");
                 }
                 else if (choice.equals("2")) {
+                    // eisagwgh filtrwn anazhthshs
                     System.out.print("Risk (low/medium/high/ANY): ");
                     String risk = scanner.nextLine().trim();
                     if(risk.isEmpty()) risk = "ANY";
@@ -62,6 +67,7 @@ public class PlayerMain {
                     String strStars = scanner.nextLine();
                     int stars = strStars.isEmpty() ? 0 : Integer.parseInt(strStars);
 
+                    // apostolh search request
                     out.writeObject("PLAYER_CMD|SEARCH|" + risk + "|" + cat + "|" + prov + "|" + stars);
                     out.flush();
                 }
@@ -71,10 +77,12 @@ public class PlayerMain {
                     System.out.print("Bet amount: ");
                     double bet = Double.parseDouble(scanner.nextLine());
 
+                    // elegxos topiku ypuloipou
                     if (bet > localBalance) {
                         System.out.println("ERROR: Insufficient local balance!");
                     } else {
                         localBalance -= bet;
+                        // apostolh play request
                         out.writeObject("PLAYER_CMD|BET|" + gName + "|" + bet + "|" + playerName);
                         out.flush();
                     }
@@ -84,6 +92,7 @@ public class PlayerMain {
                     String gName = scanner.nextLine();
                     System.out.print("Stars (1-5): ");
                     String stars = scanner.nextLine();
+                    // apostolh rate request
                     out.writeObject("PLAYER_CMD|RATE|" + gName + "|" + stars);
                     out.flush();
                 }
@@ -93,6 +102,7 @@ public class PlayerMain {
         }
     }
 
+    // thread pou akouei tis apanthseis
     private static class ServerListener extends Thread {
         private final ObjectInputStream in;
         public ServerListener(ObjectInputStream in) { this.in = in; }
@@ -102,6 +112,8 @@ public class PlayerMain {
             try {
                 while (true) {
                     Object response = in.readObject();
+
+                    // emfanizh apotelesmatwn search
                     if (response instanceof List<?>) {
                         @SuppressWarnings("unchecked")
                         List<Game> games = (List<Game>) response;
@@ -115,17 +127,21 @@ public class PlayerMain {
                         }
                     } else if (response instanceof String) {
                         String msg = (String) response;
+
+                        // diaxeirish apotelesmatos bet
                         if (msg.startsWith("PAYOUT_RESULT|")) {
                             String[] parts = msg.split("\\|");
                             double wonAmount = Double.parseDouble(parts[1]);
                             localBalance += wonAmount;
                             System.out.println("\n\n[Bet Result]: " + parts[2]);
                         }
+                        // diaxeirish epistrofhs xrhmatwn
                         else if (msg.startsWith("REFUND|")) {
                             String[] parts = msg.split("\\|");
                             localBalance += Double.parseDouble(parts[1]);
                             System.out.println("\n\n[System Error]: " + parts[2] + " (Bet Refunded)");
                         } else {
+                            // genika mhnymata
                             System.out.println("\n\n[Message]: " + msg);
                         }
                     }

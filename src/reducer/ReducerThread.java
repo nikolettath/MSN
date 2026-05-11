@@ -16,7 +16,7 @@ public class ReducerThread extends Thread {
     private final String masterIP;
     private final int masterPort;
 
-    // ΑΛΛΑΓΗ 1: Αφαιρέθηκε η μεταβλητή isReport
+    // arxikopoihsh parametrwn
     public ReducerThread(Socket socket, int sumWorkers, String masterIP, int masterPort) {
         this.socket = socket;
         this.sumWorkers = sumWorkers;
@@ -37,18 +37,19 @@ public class ReducerThread extends Thread {
 
                 JobState jobState;
 
-                // Xeiropoihtos sygxronismos panw sto koino HashMap tou ReducerMain
+                // sygxronismos panw sto map twn energwn jobs
                 synchronized (ReducerMain.activeJobs) {
                     jobState = ReducerMain.activeJobs.get(reqId);
+                    // an den yparxei to dhmioyrgei kai to apothhkevei
                     if (jobState == null) {
                         jobState = new JobState(reqId, sumWorkers);
                         ReducerMain.activeJobs.put(reqId, jobState);
-                        // ΑΛΛΑΓΗ 2: xekiname to monitor XWRIS to isReport
+                        // ksekinaei to monitor thread gia to sygkekrimeno request
                         new ResultMonitor(jobState, masterIP, masterPort).start();
                     }
                 }
 
-                // prosthhkh dedomenwn sto swsto JobState
+                // prosthkh twn dedomenwn (anazhthsh h report) sto state tou job
                 if (data instanceof List<?>) {
                     jobState.addWorkerResult((List<Game>) data);
                 } else if (data instanceof Map<?, ?>) {
@@ -58,6 +59,7 @@ public class ReducerThread extends Thread {
         } catch (IOException | ClassNotFoundException e) {
             System.err.println("Error reading from Worker: " + e.getMessage());
         } finally {
+            // asfalhs termatismos syndeshs me ton worker
             try {
                 if (socket != null && !socket.isClosed()) socket.close();
             } catch (IOException e) { e.printStackTrace(); }

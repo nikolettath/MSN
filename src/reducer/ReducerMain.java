@@ -9,12 +9,12 @@ import java.util.Map;
 
 public class ReducerMain {
 
-    // KANONIKO HashMap (oxi Concurrent). O sygxronismos tha ginetai me synchronized.
+    // xrhsh aplou map, o sygxronismos ginetai mesw synchronized
     public static final Map<String, JobState> activeJobs = new HashMap<>();
 
     public static void main(String[] args) {
 
-        // ΑΛΛΑΓΗ 1: Περιμένουμε πλέον 4 ορίσματα (αφαιρέσαμε το <is_report>)
+        // elegxos aparaithtwn orismatwn
         if (args.length < 4) {
             System.err.println("Use of: java ReducerMain <port> <sum_workers> <master_ip> <master_port>");
             System.exit(1);
@@ -25,15 +25,16 @@ public class ReducerMain {
         String masterIP = args[2];
         int masterPort = Integer.parseInt(args[3]);
 
+        // ekkinhsh tcp server tou reducer
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Smart Reducer started at port: " + port + "\n");
-            // ΑΛΛΑΓΗ 2: Ενημερώσαμε το μήνυμα εκκίνησης
             System.out.println("Waiting for " + sumWorkers + " Workers. (Unified MapReduce Mode)");
 
+            // loop pou asygxrona apodexetai syndeseis apo tous workers
             while (true) {
                 Socket workerSocket = serverSocket.accept();
 
-                // ΑΛΛΑΓΗ 3: Αφαιρέσαμε τη μεταβλητή isReport από τον constructor
+                // dhmiourgia thread gia thn eksyphrethsh kathe neou worker
                 ReducerThread t = new ReducerThread(workerSocket, sumWorkers, masterIP, masterPort);
                 t.start();
             }

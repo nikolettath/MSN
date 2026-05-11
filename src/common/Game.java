@@ -21,9 +21,11 @@ public class Game implements Serializable {
     private int jackpot;
     private double totalBets;
     private double totalPayouts;
+    // map gia apothhkeysh kerdous kazino ana paikth
     private final Map<String, Double> casinoProfitByPlayer;
     private String srgIp;
 
+    // pinakes pollaplasiastwn vash riskou
     private static final double[] LOW_RISK = {0.0, 0.0, 0.0, 0.1, 0.5, 1.0, 1.1, 1.3, 2.0, 2.5};
     private static final double[] MEDIUM_RISK = {0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.5, 2.5, 3.5};
     private static final double[] HIGH_RISK = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 6.5};
@@ -43,16 +45,19 @@ public class Game implements Serializable {
         this.totalBets = 0.0;
         this.totalPayouts = 0.0;
         this.casinoProfitByPlayer = new HashMap<>();
+        // aytomatos ypologismos field pou den yparxoun sto json
         calculateBetCategory();
         calculateJackpot();
     }
 
+    // ypologismos kathgorias pontarismatos vash elaxistou oriou
     private void calculateBetCategory() {
         if (minBet < 1.0) this.betCategory = "$";
         else if (minBet < 5.0) this.betCategory = "$$";
         else this.betCategory = "$$$";
     }
 
+    // ypologismos jackpot vash riskou
     private void calculateJackpot() {
         switch (this.riskLevel) {
             case "low": this.jackpot = 10; break;
@@ -70,6 +75,7 @@ public class Game implements Serializable {
         }
     }
 
+    // synchronized setters gia asfalh allagh apo polla threads
     public synchronized void setRiskLevel(String newRiskLevel) {
         this.riskLevel = newRiskLevel.toLowerCase();
         calculateJackpot();
@@ -84,6 +90,7 @@ public class Game implements Serializable {
         this.maxBet = maxBet;
     }
 
+    // prosthkh vathmologias kai epanaypologismos mesou orou
     public synchronized void addRating(int newStars) {
         if (newStars >= 1 && newStars <= 5) {
             double currentTotal = this.stars * this.noOfVotes;
@@ -92,9 +99,11 @@ public class Game implements Serializable {
         }
     }
 
+    // enhmerwsh tzirou kai ypologismos kerdous kazino apo sugkekrimeno paikth
     public synchronized void addBet(String playerName, double amountBet, double amountWon) {
         this.totalBets += amountBet;
         this.totalPayouts += amountWon;
+        // katharo kerdos tou kazino apo to pontarisma
         double netProfitFromThisBet = amountBet - amountWon;
         double currentProfit = casinoProfitByPlayer.getOrDefault(playerName, 0.0);
         casinoProfitByPlayer.put(playerName, currentProfit + netProfitFromThisBet);
@@ -102,6 +111,7 @@ public class Game implements Serializable {
 
     public synchronized double getCasinoProfit() { return this.totalBets - this.totalPayouts; }
 
+    // getters
     public String getGameName() { return gameName; }
     public String getProviderName() { return providerName; }
     public int getStars() { return stars; }
@@ -118,6 +128,7 @@ public class Game implements Serializable {
     public String getSrgIp() { return srgIp; }
     public void setSrgIp(String srgIp) { this.srgIp = srgIp; }
 
+    // asfalhs epistrofh antigrafou tou map me ta kerdi ana paikth
     public synchronized Map<String, Double> getCasinoProfitByPlayer() {
         return new HashMap<>(casinoProfitByPlayer);
     }
