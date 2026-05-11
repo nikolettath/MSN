@@ -1,0 +1,11 @@
+{
+  "gameName": "SuperSlots2",
+  "providerName": "CasinoTech",
+  "stars": 5,
+  "noOfVotes": 150,
+  "gameLogo": "logo.png",
+  "minBet": 1.0,
+  "maxBet": 50.0,
+  "riskLevel": "medium",
+  "hashKey": "secret123"
+}
