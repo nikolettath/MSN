@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Game implements Serializable {
+    private static final long serialVersionUID = 1L;
     private String gameName;
     private String providerName;
     private int stars;
@@ -21,6 +22,7 @@ public class Game implements Serializable {
     private double totalBets;
     private double totalPayouts;
     private final Map<String, Double> casinoProfitByPlayer;
+    private String srgIp;
 
     private static final double[] LOW_RISK = {0.0, 0.0, 0.0, 0.1, 0.5, 1.0, 1.1, 1.3, 2.0, 2.5};
     private static final double[] MEDIUM_RISK = {0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.5, 2.5, 3.5};
@@ -113,6 +115,8 @@ public class Game implements Serializable {
     public String getRiskLevel() { return riskLevel; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public String getSrgIp() { return srgIp; }
+    public void setSrgIp(String srgIp) { this.srgIp = srgIp; }
 
     public synchronized Map<String, Double> getCasinoProfitByPlayer() {
         return new HashMap<>(casinoProfitByPlayer);

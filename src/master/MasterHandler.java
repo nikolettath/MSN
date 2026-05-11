@@ -13,14 +13,16 @@ public class MasterHandler extends Thread {
     private List<WorkerInfo> workers;
 
     // Ρυθμίσεις Δικτύου (Localhost για τις δοκιμές σου)
-    private static final String SRG_IP = "localhost";
     private static final int SRG_PORT = 9090;
-    private static final String REDUCER_IP = "localhost";
     private static final int REDUCER_PORT = 5000;
+    private String srgIp;
+    private String reducerIp;
 
-    public MasterHandler(Socket socket, List<WorkerInfo> workers) {
+    public MasterHandler(Socket socket, List<WorkerInfo> workers, String srgIp, String reducerIp) {
         this.clientSocket = socket;
         this.workers = workers;
+        this.srgIp = srgIp;
+        this.reducerIp = reducerIp;
     }
 
     @Override
@@ -93,7 +95,7 @@ public class MasterHandler extends Thread {
             Master.clientRegistry.put(reqId, out);
         }
 
-        FilterRequest filterReq = new FilterRequest(reqId, category, provider, riskLevel, minStars, REDUCER_IP, REDUCER_PORT);
+        FilterRequest filterReq = new FilterRequest(reqId, category, provider, riskLevel, minStars, this.reducerIp, REDUCER_PORT);
         for (WorkerInfo w : workers) {
             sendToWorkerGeneric(filterReq, w);
         }
@@ -104,13 +106,15 @@ public class MasterHandler extends Thread {
         synchronized (Master.clientRegistry) {
             Master.clientRegistry.put(reqId, out);
         }
-        ReportRequest reportReq = new ReportRequest(reqId, command.split("\\|")[2], REDUCER_IP, REDUCER_PORT);
+        ReportRequest reportReq = new ReportRequest(reqId, command.split("\\|")[2], this.reducerIp, REDUCER_PORT);
         for (WorkerInfo w : workers) {
             sendToWorkerGeneric(reportReq, w);
         }
     }
 
     private void handleNewGame(Game game, ObjectOutputStream out) throws IOException {
+        game.setSrgIp(this.srgIp);
+
         if (!registerWithSRG(game.getGameName(), game.getHashKey())) {
             out.writeObject("ERROR: Failed to connect with SRG Server.");
             out.flush();
@@ -252,7 +256,7 @@ public class MasterHandler extends Thread {
     }
 
     private boolean registerWithSRG(String gameName, String hashKey) {
-        try (Socket s = new Socket(SRG_IP, SRG_PORT);
+        try (Socket s = new Socket(this.srgIp, SRG_PORT);
              ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(s.getInputStream())) {
             out.writeObject("REGISTER," + gameName + "," + hashKey);
