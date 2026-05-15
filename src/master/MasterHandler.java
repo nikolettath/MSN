@@ -12,12 +12,7 @@ public class MasterHandler extends Thread {
     private Socket clientSocket;
     private List<WorkerInfo> workers;
 
-<<<<<<< HEAD
-    // Ρυθμίσεις Δικτύου (Localhost για τις δοκιμές σου)
-=======
     // rythmiseis diktyou
-    private static final String SRG_IP = "localhost";
->>>>>>> a062b66e9299524251c8dc15012372704f05bcc0
     private static final int SRG_PORT = 9090;
     private static final int REDUCER_PORT = 5000;
     private String srgIp;
@@ -101,12 +96,8 @@ public class MasterHandler extends Thread {
             Master.clientRegistry.put(reqId, out);
         }
 
-<<<<<<< HEAD
-        FilterRequest filterReq = new FilterRequest(reqId, category, provider, riskLevel, minStars, this.reducerIp, REDUCER_PORT);
-=======
         // apostolh aithmatos se olous tous workers
-        FilterRequest filterReq = new FilterRequest(reqId, category, provider, riskLevel, minStars, REDUCER_IP, REDUCER_PORT);
->>>>>>> a062b66e9299524251c8dc15012372704f05bcc0
+        FilterRequest filterReq = new FilterRequest(reqId, category, provider, riskLevel, minStars, this.reducerIp, REDUCER_PORT);
         for (WorkerInfo w : workers) {
             sendToWorkerGeneric(filterReq, w);
         }
@@ -117,25 +108,18 @@ public class MasterHandler extends Thread {
         synchronized (Master.clientRegistry) {
             Master.clientRegistry.put(reqId, out);
         }
-<<<<<<< HEAD
-        ReportRequest reportReq = new ReportRequest(reqId, command.split("\\|")[2], this.reducerIp, REDUCER_PORT);
-=======
 
         // apostolh aithmatos report se olous tous workers
-        ReportRequest reportReq = new ReportRequest(reqId, command.split("\\|")[2], REDUCER_IP, REDUCER_PORT);
->>>>>>> a062b66e9299524251c8dc15012372704f05bcc0
+        ReportRequest reportReq = new ReportRequest(reqId, command.split("\\|")[2], this.reducerIp, REDUCER_PORT);
         for (WorkerInfo w : workers) {
             sendToWorkerGeneric(reportReq, w);
         }
     }
 
     private void handleNewGame(Game game, ObjectOutputStream out) throws IOException {
-<<<<<<< HEAD
         game.setSrgIp(this.srgIp);
 
-=======
         // eggrafh sto srg
->>>>>>> a062b66e9299524251c8dc15012372704f05bcc0
         if (!registerWithSRG(game.getGameName(), game.getHashKey())) {
             out.writeObject("ERROR: Failed to connect with SRG Server.");
             out.flush();

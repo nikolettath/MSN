@@ -12,12 +12,8 @@ public class PlayRequestHandler {
     // ektelesh pontarismatos kai ypologismos kerdous
     public static String processBet(Game game, double betAmount, String playerName) {
         try {
-<<<<<<< HEAD
-            try (Socket srgSocket = new Socket(game.getSrgIp(), 9090)) {
-=======
             // syndesh me ton SRG gia lhpsh tyxaiou arithmou
-            try (Socket srgSocket = new Socket("localhost", 9090)) {
->>>>>>> a062b66e9299524251c8dc15012372704f05bcc0
+            try (Socket srgSocket = new Socket(game.getSrgIp(), 9090)) {
                 ObjectOutputStream srgOut = new ObjectOutputStream(srgSocket.getOutputStream());
                 srgOut.flush();
                 ObjectInputStream srgIn = new ObjectInputStream(srgSocket.getInputStream());

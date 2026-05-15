@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Scanner;
 
 public class PlayerMain {
-    private static final String MASTER_IP = "localhost";
+    private static final String MASTER_IP = "172.20.10.2";
     private static final int MASTER_PORT = 4321;
     private static String playerName;
     // topiko portofoli paikth
