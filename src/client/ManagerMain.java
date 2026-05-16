@@ -10,7 +10,7 @@ import java.nio.file.Paths;
 import java.util.Scanner;
 
 public class ManagerMain {
-    private static final String MASTER_IP = "172.20.10.2";
+    private static final String MASTER_IP = "127.0.0.1";
     private static final int MASTER_PORT = 4321;
 
     public static void main(String[] args) {
